@@ -1,0 +1,2 @@
+import PageHeader from '../components/PageHeader';import EntityList from '../components/EntityList';import {ErrorState,LoadingState} from '../components/States';import useQuery from '../hooks/useQuery';import {getAnnouncements} from '../services/dataService'
+export default function AnnouncementsScreen(){const q=useQuery(()=>getAnnouncements(),[]);return <><PageHeader title="공지" description="운영 소식과 안내를 확인하세요."/>{q.loading?<LoadingState/>:q.error?<ErrorState error={q.error} retry={q.retry}/>:<EntityList items={q.data} emptyTitle="새 공지가 없어요"/>}</>}
