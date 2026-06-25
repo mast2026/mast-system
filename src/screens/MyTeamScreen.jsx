@@ -11,7 +11,7 @@ import { useAuth } from '../context/AuthContext'
 import useQuery from '../hooks/useQuery'
 import { getAllContests } from '../services/contestService'
 import { ensureTeamsForAcceptedLeaderApplications } from '../services/leaderService'
-import { getMyTeams, leaveTeam } from '../services/teamService'
+import { getMyTeams, requestLeaveTeam } from '../services/teamService'
 import { safeHttpUrl } from '../utils/display'
 
 export default function MyTeamScreen() {
@@ -41,10 +41,10 @@ export default function MyTeamScreen() {
     setBusy(true)
     setNotice('')
     try {
-      await leaveTeam(leaving.id, member.id, reason)
+      await requestLeaveTeam(leaving.id, member.id, reason)
       setLeaving(null)
       setReason('')
-      setNotice('팀에서 나왔습니다.')
+      setNotice('탈퇴를 신청했습니다. 관리자 승인 후 처리됩니다.')
       q.retry()
     } catch (err) {
       setNotice(err.message)
@@ -96,19 +96,20 @@ export default function MyTeamScreen() {
               <Link className="button primary" to={`/teams/${team.id}/applicants`}><UsersRound />지원자 보기</Link>
               <Link className="button secondary" to={`/teams/${team.id}/manage`}><Settings />팀 관리</Link>
               <Link className="button secondary" to={`/teams/${team.id}/result`}><Trophy />결과 등록</Link>
-            </> : <button className="button danger" disabled={!team.capabilities.membershipOperations} title={!team.capabilities.membershipOperations ? 'DB 컬럼 추가 필요' : ''} onClick={() => setLeaving(team)}><LogOut />팀 탈퇴</button>}
+            </> : team.pendingLeave ? <span className="muted-chip">탈퇴 신청 중 · 관리자 승인 대기</span>
+              : <button className="button danger" disabled={!team.capabilities.membershipOperations} title={!team.capabilities.membershipOperations ? 'DB 컬럼 추가 필요' : ''} onClick={() => setLeaving(team)}><LogOut />탈퇴 신청</button>}
           </div>
           {!isLeader && !team.capabilities.membershipOperations && <small className="disabled-hint">DB 컬럼 추가 필요 · 팀 나가기 기능이 비활성화되어 있습니다.</small>}
         </article>
       })}
     </div>}
-    {leaving && <Modal title="팀에서 탈퇴할까요?" onClose={() => setLeaving(null)}>
-      <p className="modal-copy">탈퇴 사유는 운영진에게 전달됩니다. 탈퇴 후 다시 참여하려면 해당 팀에 새로 지원해야 합니다.</p>
+    {leaving && <Modal title="팀 탈퇴를 신청할까요?" onClose={() => setLeaving(null)}>
+      <p className="modal-copy">탈퇴는 바로 처리되지 않고 <b>관리자 승인 후</b> 확정됩니다. 사유는 운영진에게 전달돼요. 승인 전까지는 팀원으로 유지됩니다.</p>
       <form className="data-form" onSubmit={(e) => { e.preventDefault(); submitLeave() }}>
         <Field label="탈퇴 사유" required>
           <textarea value={reason} onChange={(e) => setReason(e.target.value)} required placeholder="운영진이 확인할 수 있도록 탈퇴 사유를 입력해 주세요." />
         </Field>
-        <FormActions submitting={busy} submitLabel="팀 탈퇴" onCancel={() => setLeaving(null)} />
+        <FormActions submitting={busy} submitLabel="탈퇴 신청" onCancel={() => setLeaving(null)} />
       </form>
     </Modal>}
   </>

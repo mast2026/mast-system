@@ -8,6 +8,8 @@ import { Field, FormActions, TagSelector } from '../components/FormControls'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import { useAuth } from '../context/AuthContext'
 import useQuery from '../hooks/useQuery'
+import ActivityWeatherIcon from '../components/ActivityWeatherIcon'
+import { getMemberActivityWeather } from '../services/activityWeatherService'
 import { INTEREST_AREAS, PERSONALITY_TAGS, ROLE_TAGS, SKILL_TAGS } from '../constants/tags'
 import { decideApplication, getLeaderApplicationsForTeam } from '../services/applicationService'
 import { deleteTeamPost, getTeamManagement, removeTeamMember, setRecruitmentStatus, submitTeamMatchingComplete, updateOpenChatUrl, updateTeamPost } from '../services/teamService'
@@ -239,8 +241,22 @@ function ReasonModal({ title, reason, setReason, busy, onClose, onSubmit }) {
   </Modal>
 }
 
+function ApplicantWeather({ applicant }) {
+  const q = useQuery(() => getMemberActivityWeather(applicant), [applicant?.id])
+  if (!applicant) return null
+  if (q.loading) return <div className="applicant-weather-row"><span>활동날씨</span><b>불러오는 중…</b></div>
+  const aw = q.data
+  if (q.error || !aw) return <div className="applicant-weather-row"><span>활동날씨</span><b>정보 없음</b></div>
+  if (aw.exempt) return <div className="applicant-weather-row"><span>활동날씨</span><b>미적용 (지도교수·고문)</b></div>
+  return <div className="applicant-weather-row">
+    <ActivityWeatherIcon weather={aw} size="small" />
+    <div><span>활동날씨</span><b>{aw.score ?? 0}점 · {aw.grade || '-'}</b></div>
+  </div>
+}
+
 function ApplicationDetail({ application }) {
   return <div className="application-detail">
+    <ApplicantWeather applicant={application.applicant} />
     <Row label="역량 어필" value={application.capability_appeal} />
     <Row label="성향 해시태그" value={tagsToText(application.personality_tags)} />
     <Row label="역량 해시태그" value={tagsToText(application.skill_tags) || application.survey_role} />

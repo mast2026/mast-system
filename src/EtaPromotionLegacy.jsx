@@ -603,17 +603,15 @@ function MemberHome(props) {
       ) : (
         <div style={homeHeroCard({ height: 258, overflow: "visible", background: "transparent" })}>
           <div style={{ position: "absolute", zIndex: 0, inset: "-80px -36px -58px -36px", background: "radial-gradient(circle at 72% 34%, rgba(190,225,255,.64), transparent 38%), radial-gradient(circle at 18% 24%, rgba(255,235,160,.24), transparent 34%)", pointerEvents: "none" }} />
-          <img src={assets.hero.megaphone} alt="" style={{ position: "absolute", zIndex: 1, left: -6, top: 48, width: 210, height: "auto", objectFit: "contain", opacity: 0.96, pointerEvents: "none", filter: "drop-shadow(0 18px 30px rgba(58,105,220,0.16))" }} />
-          <div style={{ position: "absolute", zIndex: 3, right: 0, top: 22, left: 0, textAlign: "center", pointerEvents: "none" }}>
-            <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", maxWidth: "calc(100vw - 42px)", minHeight: 28, padding: "0 10px", borderRadius: 16, background: "#F1FFF8", color: "#00A879", fontSize: fitFontSize("오늘 홍보 미션 · " + fmtShortDate(today), 13, 10, 12, 4), lineHeight: "18px", fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>오늘 홍보 미션 · {fmtShortDate(today)}</div>
-          </div>
-          <div style={{ position: "absolute", zIndex: 3, left: 158, top: 58, right: 14, textAlign: "center", minWidth: 0 }}>
-            <div style={{ fontSize: 24, lineHeight: "28px", fontWeight: 900, color: "#071C59", letterSpacing: "-0.04em" }}>오늘</div>
-            <div style={{ fontSize: 25, lineHeight: "31px", fontWeight: 900, color: "#2F78F6", letterSpacing: "-0.05em", whiteSpace: "normal", wordBreak: "keep-all" }}>{isAssignee ? "대상자입니다" : "대상자가 아니에요"}</div>
-            <div style={{ marginTop: 5, fontSize: fitFontSize(mission.title, 13, 11, 13, 5), lineHeight: "18px", color: "#6F7D99", fontWeight: 900, display: "flex", alignItems: "flex-start", justifyContent: "center", gap: 4, wordBreak: "keep-all" }}>
-              <IconAttach color="#6D93EA" /> <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{mission.title}</span>
-            </div>
-            <button onClick={function() { props.onTab(isAssignee ? "cert" : "record"); }} style={{ marginTop: 9, width: "100%", maxWidth: 126, height: 44, border: "none", borderRadius: 15, background: "#0869F4", color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: FONT, boxShadow: "0 12px 24px rgba(8,105,244,0.2)", cursor: "pointer" }}>
+          <img src={assets.hero.megaphone} alt="" style={{ position: "absolute", zIndex: 1, left: -18, bottom: -6, width: 188, height: "auto", objectFit: "contain", opacity: 0.8, pointerEvents: "none", filter: "drop-shadow(0 18px 30px rgba(58,105,220,0.14))" }} />
+          <div style={{ position: "relative", zIndex: 3, paddingTop: 12, textAlign: "center" }}>
+            {/* 날짜: 10% 크게 + 위로 10 이동, 전체 가운데 */}
+            <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", maxWidth: "calc(100vw - 42px)", minHeight: 30, padding: "0 12px", borderRadius: 16, background: "#F1FFF8", color: "#00A879", fontSize: fitFontSize("오늘 홍보 미션 · " + fmtShortDate(today), 14, 11, 13, 4), lineHeight: "20px", fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>오늘 홍보 미션 · {fmtShortDate(today)}</div>
+            {/* 미션 이름: 날짜 아래, 전체 가운데 */}
+            <div style={{ marginTop: 9, padding: "0 14px", fontSize: fitFontSize(mission.title, 18, 13, 18, 6), lineHeight: "23px", color: "#071C59", fontWeight: 900, letterSpacing: "-0.03em", wordBreak: "keep-all", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{mission.title}</div>
+            {/* 멘트: 미션 이름 아래로 */}
+            <div style={{ marginTop: 8, fontSize: 22, lineHeight: "28px", fontWeight: 900, color: "#2F78F6", letterSpacing: "-0.04em", wordBreak: "keep-all" }}>{isAssignee ? "오늘 대상자입니다" : "오늘 대상자가 아니에요"}</div>
+            <button onClick={function() { props.onTab(isAssignee ? "cert" : "record"); }} style={{ marginTop: 13, width: "100%", maxWidth: 160, height: 44, border: "none", borderRadius: 15, background: "#0869F4", color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: FONT, boxShadow: "0 12px 24px rgba(8,105,244,0.2)", cursor: "pointer" }}>
               {isAssignee ? "인증하기" : "내 기록"} <span style={{ marginLeft: 6, fontSize: 22, lineHeight: 0 }}>›</span>
             </button>
           </div>

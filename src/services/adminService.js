@@ -203,6 +203,67 @@ async function refreshTeamMemberCount(teamId) {
   await client.from(TABLES.teams).update({ current_members: Math.max(1, activeIds.size) }).eq('id', teamId)
 }
 
+// ===== 팀원 탈퇴 신청(leave_requested) 관리 =====
+export async function getLeaveRequests() {
+  const client = requireSupabase()
+  const [{ data: links, error }, { data: members }, { data: teams }, { data: contests }] = await Promise.all([
+    client.from(TABLES.teamMembers).select('*').eq('status', 'leave_requested'),
+    client.from(TABLES.members).select('*'),
+    client.from(TABLES.teams).select('*'),
+    client.from(TABLES.contests).select('*'),
+  ])
+  throwIfError(error)
+  const membersById = byId(members)
+  const teamsById = byId(teams)
+  const contestsById = byId(contests)
+  return (links ?? []).map((link) => {
+    const team = teamsById.get(link.team_id)
+    return {
+      ...link,
+      member: membersById.get(link.member_id),
+      team,
+      contest: contestsById.get(team?.contest_id),
+    }
+  })
+}
+
+export async function getLeaveRequestCount() {
+  try {
+    const { count, error } = await requireSupabase()
+      .from(TABLES.teamMembers)
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'leave_requested')
+    if (error) return 0
+    return count ?? 0
+  } catch {
+    return 0
+  }
+}
+
+export async function approveLeaveRequest(linkId) {
+  const client = requireSupabase()
+  const { data: link, error } = await client.from(TABLES.teamMembers).select('*').eq('id', linkId).maybeSingle()
+  throwIfError(error)
+  if (!link) throw new Error('탈퇴 신청을 찾지 못했습니다.')
+  const { data: changed, error: upError } = await client.from(TABLES.teamMembers)
+    .update({ status: 'left', left_at: new Date().toISOString() })
+    .eq('id', linkId).eq('status', 'leave_requested').select('id').maybeSingle()
+  throwIfError(upError)
+  if (!changed) throw new Error('이미 처리된 신청입니다.')
+  await refreshTeamMemberCount(link.team_id)
+  return true
+}
+
+export async function rejectLeaveRequest(linkId) {
+  const client = requireSupabase()
+  const { data: changed, error } = await client.from(TABLES.teamMembers)
+    .update({ status: 'active', leave_reason: null, left_at: null })
+    .eq('id', linkId).eq('status', 'leave_requested').select('id').maybeSingle()
+  throwIfError(error)
+  if (!changed) throw new Error('이미 처리된 신청입니다.')
+  return true
+}
+
 export async function getAdminApplications() {
   const client = requireSupabase()
   const [{ data: applications, error }, { data: teams }, { data: contests }, { data: members }] = await Promise.all([
@@ -399,7 +460,10 @@ export async function updateAdminPeerReviewStatus(reviewId, status) {
     .select('*')
     .maybeSingle()
   if (error) {
-    throw new Error(`${error.message} · DB 컬럼 추가 필요: team_matching_peer_reviews.status`)
+    throw new Error(`${error.message} · DB에 team_matching_peer_reviews.status 컬럼이 필요합니다. add-peer-review-status.sql 을 실행해 주세요.`)
+  }
+  if (!data) {
+    throw new Error('동료평가 상태가 저장되지 않았습니다. team_matching_peer_reviews.status 컬럼 추가(add-peer-review-status.sql) 또는 권한을 확인해 주세요.')
   }
   return data
 }

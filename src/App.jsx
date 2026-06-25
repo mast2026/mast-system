@@ -40,6 +40,7 @@ import AdminAnnouncementsScreen from './screens/admin/AdminAnnouncementsScreen'
 import AdminNotificationsScreen from './screens/admin/AdminNotificationsScreen'
 import AdminPeerReviewsScreen from './screens/admin/AdminPeerReviewsScreen'
 import AdminAwardsScreen from './screens/admin/AdminAwardsScreen'
+import AdminLeaveRequestsScreen from './screens/admin/AdminLeaveRequestsScreen'
 
 function MemberRoute() {
   const { member } = useAuth() || {}
@@ -115,6 +116,7 @@ function AppRoutes() {
       <Route path="activity-weather" element={<AdminActivityWeatherScreen />} />
       <Route path="peer-reviews" element={<AdminPeerReviewsScreen />} />
       <Route path="awards" element={<AdminAwardsScreen />} />
+      <Route path="leave-requests" element={<AdminLeaveRequestsScreen />} />
     </Route>
 
     <Route path="*" element={<Navigate to="/" replace />} />

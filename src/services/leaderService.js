@@ -123,6 +123,19 @@ export async function applyForLeader(memberId, contestId, message) {
   return normalizeApplication(data)
 }
 
+export async function deleteMyLeaderApplication(applicationId, memberId) {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .from(TABLES.leaderApplications)
+    .delete()
+    .eq('id', applicationId)
+    .eq('member_id', memberId)
+    .select('id')
+  throwIfError(error)
+  if (!data || !data.length) throw new Error('삭제되지 않았습니다. 권한(prototype-write-access.sql)을 확인해 주세요.')
+  return true
+}
+
 export async function getPendingLeaderApplications() {
   const client = requireSupabase()
   const [{ data: applications, error }, { data: members, error: memberError }, { data: contests, error: contestError }] = await Promise.all([

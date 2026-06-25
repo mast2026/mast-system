@@ -114,6 +114,19 @@ export async function getMyApplicationDashboard(memberId) {
   }
 }
 
+export async function deleteMyApplication(applicationId, memberId) {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .from(TABLES.applications)
+    .delete()
+    .eq('id', applicationId)
+    .eq('applicant_id', memberId)
+    .select('id')
+  throwIfError(error)
+  if (!data || !data.length) throw new Error('삭제되지 않았습니다. 권한(prototype-write-access.sql)을 확인해 주세요.')
+  return true
+}
+
 async function notifyApplicationResult(client, application, team, decision, rejectReason = '') {
   const { data: contest } = await client.from(TABLES.contests).select('title').eq('id', team.contest_id).maybeSingle()
   await client.from(TABLES.notifications).insert({

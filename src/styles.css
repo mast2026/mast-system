@@ -1878,10 +1878,8 @@
   border:0!important;
   box-shadow:none!important;
   border-radius:0!important;
-  background:
-    radial-gradient(circle at 78% 34%,rgba(215,235,255,.78),transparent 35%),
-    radial-gradient(circle at 18% 12%,rgba(255,239,183,.25),transparent 36%),
-    linear-gradient(145deg,#f7fbff,#fffdf8)!important;
+  /* 카드 배경 제거: 페이지 배경 위에 글씨·아이콘이 바로 얹히도록 투명 처리 */
+  background:transparent!important;
 }
 .mast-main-home-hero{
   margin:0 -18px 4px!important;
@@ -4608,10 +4606,12 @@ svg.login-v2-wave{
 .mast-home-hero-weather{
   position:absolute!important;
   z-index:1!important;
-  right:-13%!important;
-  bottom:-12%!important;
-  width:58%!important;
-  height:112%!important;
+  right:6%!important;
+  top:50%!important;
+  bottom:auto!important;
+  transform:translate(-20px,calc(-50% - 14px))!important;
+  width:160px!important;
+  height:160px!important;
   display:grid!important;
   place-items:center!important;
   pointer-events:none!important;
@@ -4625,16 +4625,19 @@ svg.login-v2-wave{
 }
 .mast-home-hero-weather .weather-image-icon img{
   filter:none!important;
+  transform:scale(1.05)!important;
 }
 .mast-main-home-hero .mast-home-hero-image{
   display:none!important;
 }
 @media(max-width:600px){
   .mast-home-hero-weather{
-    right:-18%!important;
-    bottom:-8%!important;
-    width:68%!important;
-    height:104%!important;
+    right:5%!important;
+    top:50%!important;
+    bottom:auto!important;
+    transform:translate(-16px,calc(-50% - 12px))!important;
+    width:128px!important;
+    height:128px!important;
   }
 }
 svg.login-v2-wave path{
@@ -4643,3 +4646,20 @@ svg.login-v2-wave path{
 .login-v2-form{
   box-shadow:none!important;
 }
+
+/* 지원서 상세 - 지원자 활동날씨 */
+.applicant-weather-row{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px;border-radius:14px;background:linear-gradient(135deg,#f3f8ff,#eef5ff);border:1px solid #e3edfb}
+.applicant-weather-row .weather-icon{flex:0 0 auto}
+.applicant-weather-row span{font-size:11px;color:#7a89a3;font-weight:700;display:block}
+.applicant-weather-row b{font-size:14px;color:#1b2a4a;font-weight:800}
+
+/* 관리자 - 팀 탈퇴 신청 목록 */
+.leave-request-list{display:flex;flex-direction:column;gap:12px}
+.leave-request-card{background:#fff;border:1px solid #eef2f8;border-radius:18px;padding:16px;box-shadow:0 8px 22px rgba(55,88,135,.06)}
+.leave-request-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.leave-request-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#fdecec;color:#d2433a;flex:0 0 auto}
+.leave-request-avatar svg{width:20px;height:20px}
+.leave-request-head b{display:block;font-size:15px;color:#1b2a4a}
+.leave-request-head small{font-size:12px;color:#7a89a3}
+.leave-request-reason{margin:0 0 12px;font-size:13px;color:#52617a;line-height:1.55;background:#f7f9fc;border-radius:12px;padding:10px 12px}
+.leave-request-actions{display:flex;gap:10px}

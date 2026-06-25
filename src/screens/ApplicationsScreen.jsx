@@ -1,11 +1,13 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, Clock3, XCircle } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Clock3, Trash2, XCircle } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Badge from '../components/Badge'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import { useAuth } from '../context/AuthContext'
 import useQuery from '../hooks/useQuery'
-import { getMyApplicationDashboard } from '../services/applicationService'
+import { deleteMyApplication, getMyApplicationDashboard } from '../services/applicationService'
+import { deleteMyLeaderApplication } from '../services/leaderService'
 import { formatDate } from '../utils/display'
 
 const statusCopy = {
@@ -17,12 +19,28 @@ const statusCopy = {
 export default function ApplicationsScreen() {
   const { member } = useAuth()
   const q = useQuery(() => getMyApplicationDashboard(member.id), [member.id])
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState('')
   const leaderApplications = q.data?.leaderApplications ?? []
   const teamApplications = q.data?.teamApplications ?? []
   const hasRows = leaderApplications.length || teamApplications.length
 
+  const removeTeamApp = async (application) => {
+    if (!window.confirm('이 팀원 지원 내역을 삭제할까요?')) return
+    setBusy(true); setNotice('')
+    try { await deleteMyApplication(application.id, member.id); setNotice('지원 내역을 삭제했습니다.'); q.retry() }
+    catch (e) { setNotice(e.message) } finally { setBusy(false) }
+  }
+  const removeLeaderApp = async (application) => {
+    if (!window.confirm('이 팀장 신청 내역을 삭제할까요?')) return
+    setBusy(true); setNotice('')
+    try { await deleteMyLeaderApplication(application.id, member.id); setNotice('팀장 신청 내역을 삭제했습니다.'); q.retry() }
+    catch (e) { setNotice(e.message) } finally { setBusy(false) }
+  }
+
   return <>
     <PageHeader title="내 지원 현황" description="팀장 신청과 팀원 지원 상태를 함께 확인하세요." />
+    {notice && <div className="form-notice">{notice}</div>}
     {q.loading ? <LoadingState /> : q.error ? <ErrorState error={q.error} retry={q.retry} /> : !hasRows ? <EmptyState title="아직 신청 내역이 없어요" description="공모전 상세에서 팀장 신청 또는 모집 중인 팀 지원을 할 수 있습니다." /> : <div className="application-status-wrap">
       <section className="application-status-section">
         <div className="section-title-row">
@@ -30,7 +48,7 @@ export default function ApplicationsScreen() {
           <small>{leaderApplications.length}건</small>
         </div>
         {leaderApplications.length ? <div className="application-status-list">
-          {leaderApplications.map((application) => <LeaderApplicationCard key={application.id} application={application} />)}
+          {leaderApplications.map((application) => <LeaderApplicationCard key={application.id} application={application} onDelete={removeLeaderApp} busy={busy} />)}
         </div> : <EmptyState title="팀장 신청 내역이 없어요" description="공모전별로 팀 공고 작성 신청을 할 수 있습니다." />}
       </section>
 
@@ -67,6 +85,7 @@ export default function ApplicationsScreen() {
             : application.team?.id
                 ? <Link className="button secondary small" to={`/teams/${application.team.id}`}>팀 공고 보기 <ArrowRight /></Link>
                 : <Link className="button secondary small" to="/teams">팀 찾기 <ArrowRight /></Link>}
+            <button className="button danger small" disabled={busy} onClick={() => removeTeamApp(application)}><Trash2 /> 삭제</button>
           </div>
         </article>
       })}
@@ -76,7 +95,7 @@ export default function ApplicationsScreen() {
   </>
 }
 
-function LeaderApplicationCard({ application }) {
+function LeaderApplicationCard({ application, onDelete, busy }) {
   const status = statusCopy[application.status] ?? statusCopy.pending
   const Icon = status.icon
   const contestTitle = application.contest?.title || '공모전'
@@ -106,6 +125,7 @@ function LeaderApplicationCard({ application }) {
         : application.contest_id
           ? <Link className="button secondary small" to={`/leader-application?contest=${application.contest_id}`}>신청 화면 보기 <ArrowRight /></Link>
           : <Link className="button secondary small" to="/leader-application">팀장 신청 <ArrowRight /></Link>}
+      <button className="button danger small" disabled={busy} onClick={() => onDelete(application)}><Trash2 /> 삭제</button>
     </div>
   </article>
 }

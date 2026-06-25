@@ -165,11 +165,13 @@ function cleanTeamPayload(values, capabilities = {}) {
 export async function getMyTeams(memberId) {
   const client = requireSupabase(); const capabilities = await detectTeamCapabilities()
   const { data: links, error: linkError } = await client.from(TABLES.teamMembers).select('*').eq('member_id', memberId); throwIfError(linkError)
-  const activeIds = new Set((links ?? []).filter((x) => activeLink(x, capabilities.membershipStatus)).map((x) => x.team_id)); const ids = [...activeIds]
+  const activeIds = new Set((links ?? []).filter((x) => activeLink(x, capabilities.membershipStatus)).map((x) => x.team_id))
+  const pendingLeaveIds = new Set((links ?? []).filter((x) => x.status === 'leave_requested').map((x) => x.team_id))
+  const ids = [...new Set([...activeIds, ...pendingLeaveIds])]
   let teamQuery = client.from(TABLES.teams).select('*').order('id', { ascending: false }); teamQuery = ids.length ? teamQuery.or(`leader_id.eq.${memberId},id.in.(${ids.join(',')})`) : teamQuery.eq('leader_id', memberId)
   const [{ data: teams, error }, { data: contests, error: contestError }, { data: allLinks, error: allLinksError }] = await Promise.all([teamQuery, client.from(TABLES.contests).select('*'), client.from(TABLES.teamMembers).select('team_id,member_id,status')])
   throwIfError(error || contestError || allLinksError); const contestsById = new Map((contests ?? []).map((x) => [x.id, x]))
-  return (teams ?? []).map((team) => ({ ...team, current_members: effectiveMemberCount(team, allLinks), contest: contestsById.get(team.contest_id), viewerIsActiveMember: activeIds.has(team.id), canViewChat: team.leader_id === memberId || activeIds.has(team.id), capabilities }))
+  return (teams ?? []).map((team) => ({ ...team, current_members: effectiveMemberCount(team, allLinks), contest: contestsById.get(team.contest_id), viewerIsActiveMember: activeIds.has(team.id), pendingLeave: pendingLeaveIds.has(team.id), canViewChat: team.leader_id === memberId || activeIds.has(team.id), capabilities }))
 }
 
 export async function getTeamManagement(teamId, leaderId) {
@@ -215,6 +217,29 @@ async function changeMemberStatus({ teamId, memberId, actorId, status, reason })
 export const leaveTeam = (teamId, memberId, reason) => changeMemberStatus({ teamId, memberId, actorId: memberId, status: 'left', reason })
 export const removeTeamMember = (teamId, memberId, leaderId, reason) => changeMemberStatus({ teamId, memberId, actorId: leaderId, status: 'removed', reason })
 
+// 탈퇴는 즉시 처리하지 않고 신청 → 관리자 승인 구조. 본인(팀원)이 신청합니다.
+export async function requestLeaveTeam(teamId, memberId, reason) {
+  const client = requireSupabase()
+  const capabilities = await detectTeamCapabilities()
+  if (!capabilities.membershipOperations) throw new Error('DB에 팀원 상태 관리 컬럼 추가가 필요합니다.')
+  if (!reason || !reason.trim()) throw new Error('탈퇴 사유를 입력해 주세요.')
+  const { data: team, error: teamError } = await client.from(TABLES.teams).select('*').eq('id', teamId).maybeSingle()
+  throwIfError(teamError)
+  if (!team) throw new Error('팀을 찾을 수 없습니다.')
+  if (Number(memberId) === Number(team.leader_id)) throw new Error('팀장은 탈퇴 신청 대상이 아닙니다.')
+  const { data: membership, error: linkError } = await client.from(TABLES.teamMembers)
+    .select('*').eq('team_id', teamId).eq('member_id', memberId).eq('status', 'active').maybeSingle()
+  throwIfError(linkError)
+  if (!membership) throw new Error('활동 중인 팀원이 아니거나 이미 탈퇴 신청한 상태입니다.')
+  const { data: changed, error } = await client.from(TABLES.teamMembers)
+    .update({ status: 'leave_requested', leave_reason: reason.trim() })
+    .eq('id', membership.id).eq('status', 'active').select('id').maybeSingle()
+  throwIfError(error)
+  if (!changed) throw new Error('이미 처리된 신청입니다.')
+  await notifyAdminsOfTeamExit(client, { team, memberId, actorId: memberId, status: 'leave_requested', reason })
+  return true
+}
+
 export async function setRecruitmentStatus(teamId, leaderId, status) {
   if (!['recruiting', 'closed'].includes(status)) throw new Error('지원하지 않는 모집 상태입니다.')
   const client = requireSupabase(); const { data: team, error } = await client.from(TABLES.teams).select('*').eq('id', teamId).eq('leader_id', leaderId).maybeSingle(); throwIfError(error); if (!team) throw new Error('이 팀을 관리할 권한이 없습니다.')
@@ -243,10 +268,10 @@ async function notifyAdminsOfTeamExit(client, { team, memberId, actorId, status,
     ])
     const payloads = (admins ?? []).map((admin) => ({
       member_id: admin.id,
-      type: status === 'left' ? 'team_member_left' : 'team_member_removed',
-      title: status === 'left' ? '팀원이 팀을 탈퇴했습니다.' : '팀원이 제외되었습니다.',
+      type: status === 'leave_requested' ? 'team_leave_requested' : status === 'left' ? 'team_member_left' : 'team_member_removed',
+      title: status === 'leave_requested' ? '팀원이 탈퇴를 신청했습니다.' : status === 'left' ? '팀원이 팀을 탈퇴했습니다.' : '팀원이 제외되었습니다.',
       body: `${contest?.title || '공모전'} / 팀 ${team.id}\n대상: ${member?.name || memberId}\n처리자: ${actor?.name || actorId}\n사유: ${reason || '-'}`,
-      href: `/admin/teams`,
+      href: status === 'leave_requested' ? '/admin/leave-requests' : '/admin/teams',
     }))
     if (payloads.length) await client.from(TABLES.notifications).insert(payloads)
   } catch (error) {
