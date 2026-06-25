@@ -1,4 +1,4 @@
-# 모여라 — 공모전 팀매칭 MVP 5차
+# MAST 동아리 통합 시스템
 
 React + Vite와 기존 Supabase `team_matching_*` 테이블만 사용하는 팀매칭 MVP입니다.
 
