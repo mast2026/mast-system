@@ -54,12 +54,9 @@ export default function HomeScreen() {
     <section className="mast-home-hero mast-main-home-hero">
       <div className="mast-home-copy">
         <h1>안녕하세요,<br /><b>{member.name}</b>님</h1>
-        <p>오늘 필요한 활동을 확인해보세요.</p>
         <Link to="/my/teams" className="team-count-pill">참여 중인 팀 <strong>{myTeams.length}개</strong><ChevronRight /></Link>
       </div>
-      <div className="mast-home-hero-weather" aria-hidden="true">
-        <ActivityWeatherIcon weather={weatherQuery.data ?? { weatherType: 'collecting', grade: '확인 중' }} size="hero" />
-      </div>
+      <img className="mast-home-hero-login-img" src="/assets/hero/login-hero.webp" alt="" aria-hidden="true" />
     </section>
 
     {data.announcements[0] && <Link to="/announcements" className="mast-home-notice-banner">

@@ -1,5 +1,5 @@
 {
-  "name": "MAST 공모전 팀매칭 시스템",
+  "name": "MAST 동아리 통합 시스템",
   "short_name": "MAST",
   "description": "공모전 팀매칭부터 홍보 미션, 활동날씨까지 한 곳에서 관리하는 MAST 동아리 플랫폼",
   "start_url": "/",
@@ -8,8 +8,8 @@
   "background_color": "#ffffff",
   "theme_color": "#eaf7ff",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/touch-icon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/touch-icon.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/touch-icon.png", "sizes": "any", "type": "image/png", "purpose": "any" }
   ]
 }

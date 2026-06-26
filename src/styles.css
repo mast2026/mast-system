@@ -596,7 +596,7 @@
 }
 .contest-main-hero img{right:-2px!important}
 .weather-hero .weather-size-hero{
-  right:6px!important;
+  right:21px!important;
 }
 
 /* Application status cards */
@@ -691,7 +691,7 @@
   .mast-home-hero{margin:-8px -16px 4px!important;padding:22px 16px 16px!important}
   .contest-main-hero{margin:-8px -16px 8px!important;padding:20px 124px 18px 16px!important;overflow:hidden!important}
   .contest-main-hero img{right:-30px!important}
-  .weather-hero .weather-size-hero{right:6px!important}
+  .weather-hero .weather-size-hero{right:21px!important}
   .application-status-actions .button{width:100%}
   .monthly-schedule-card{grid-template-columns:68px minmax(0,1fr)}
   .monthly-calendar-visual b{font-size:25px}
@@ -4677,3 +4677,110 @@ svg.login-v2-wave path{
 .leave-request-head small{font-size:12px;color:#7a89a3}
 .leave-request-reason{margin:0 0 12px;font-size:13px;color:#52617a;line-height:1.55;background:#f7f9fc;border-radius:12px;padding:10px 12px}
 .leave-request-actions{display:flex;gap:10px}
+
+/* 모바일: 글자 자동확대 방지만 (줌 잠금은 index.html viewport에서 처리, 스크롤 영향 없음) */
+html,body{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{overflow-x:hidden}
+
+/* ===== 관리자 히어로: 모바일에서도 보이게 ===== */
+@media(max-width:900px){
+  .admin-hero{display:grid!important;grid-template-columns:minmax(0,1fr) 92px!important;align-items:center!important;gap:10px!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:6px 2px 12px!important;min-height:0!important;overflow:visible!important}
+  .admin-hero .admin-kicker{font-size:11px!important;letter-spacing:.08em!important}
+  .admin-hero h1{font-size:26px!important;margin:4px 0 6px!important}
+  .admin-hero p{font-size:12px!important;line-height:1.5!important}
+  .admin-hero-image{display:block!important;width:92px!important;max-width:30vw!important;height:auto!important;justify-self:end!important}
+}
+
+/* 홈 히어로: 로그인 일러스트 사용 (.mast-home-hero img 의 cover/126% 규칙 차단) */
+.mast-main-home-hero .mast-home-hero-login-img{
+  position:relative;z-index:1;
+  width:min(90vw,250px)!important;max-width:none!important;height:auto!important;
+  object-fit:contain!important;object-position:center!important;
+  justify-self:end;align-self:center;
+  margin:0!important;transform:translateX(-25px)!important;mix-blend-mode:normal!important;
+  filter:drop-shadow(0 16px 26px rgba(70,110,200,.18));
+}
+@media(max-width:600px){
+  .mast-main-home-hero .mast-home-hero-login-img{width:min(90vw,200px)!important}
+}
+
+/* 관리자 히어로 항상 표시 (collapsed/숨김 규칙 무력화) */
+.admin-hero,.admin-top-collapsed .admin-hero{display:grid!important}
+
+/* ===== 배경 경계선(seam) 제거: 화면 전체 하나의 매끄러운 고정 그라데이션 ===== */
+body{
+  background:
+    radial-gradient(150% 95% at 12% -8%, rgba(168,222,255,.50), transparent 64%),
+    radial-gradient(140% 85% at 96% -2%, rgba(255,226,120,.34), transparent 60%),
+    #eef6fc !important;
+  background-attachment:fixed !important;
+}
+/* 히어로 글씨 전체적으로 오른쪽 15 이동 */
+.mast-home-copy,
+.system-entry-hero>div:first-child,
+.attendance-live-hero>div:first-child,
+.admin-hero>div:first-child,
+.weather-hero>div:first-child,
+.contest-main-hero>div:first-child,
+.contest-home-hero>div:first-child{transform:translateX(15px)}
+.app-shell:before,.app-shell:after{display:none!important}
+.app-shell,.app-main{background:transparent!important}
+/* 히어로/페이지가 자기만의 배경 밴드를 못 만들게 (경계선 원인 제거) */
+.mast-main-home-hero,.contest-home-hero,.contest-main-hero,.system-entry-hero,.attendance-live-hero,.weather-hero,.promotion-home-hero-inline{background:transparent!important}
+.contest-main-hero{box-shadow:none!important;border:0!important}
+
+/* 홈 히어로: 글씨+아이콘 오른쪽 10 추가 이동, 아래 여백 15 축소 */
+.mast-main-home-hero .mast-home-copy{transform:translateX(25px)!important}
+.mast-main-home-hero .mast-home-hero-login-img{transform:translateX(-15px)!important}
+.mast-main-home-hero{margin-bottom:-11px!important}
+
+/* 홈 히어로 여백 축소: 위/오른쪽/아래 10씩 */
+.mast-main-home-hero{padding-top:12px!important;padding-right:6px!important;padding-bottom:6px!important;margin-bottom:-21px!important}
+
+/* ===== 로그인 화면 컴팩트: 스크롤 없이 한 화면에 ===== */
+.login-v2-hero{padding-top:20px!important}
+.login-v2-hero-copy h1{font-size:26px!important;line-height:1.22!important}
+.login-v2-hero-copy p{font-size:13px!important;margin-top:7px!important;line-height:1.5!important}
+.login-v2-art{height:172px!important}
+.login-v2-art>img{width:min(66%,280px)!important}
+.lv2-bubble.trophy{width:44px!important;height:44px!important;top:44%!important}
+.lv2-bubble.users{width:46px!important;height:46px!important}
+.lv2-bubble.mega{width:36px!important;height:36px!important}
+.login-v2-form h2{font-size:22px!important;margin-bottom:4px!important}
+.login-v2-sub{font-size:12.5px!important;line-height:1.5!important;margin-bottom:12px!important}
+.login-v2-form form{gap:9px!important}
+.login-input input,.login-input select{padding:13px 12px!important;font-size:14px!important}
+.login-v2-submit{padding:14px!important;margin-top:4px!important}
+.login-v2-divider{margin:13px 0!important}
+.login-v2-alt-btn{padding:13px!important}
+.login-v2-forgot{margin-top:11px!important}
+.login-v2-form{padding-bottom:24px!important}
+
+/* 물결 높낮이 20% 축소 + 로그인 요소 위로 17 */
+svg.login-v2-wave{height:140px!important}
+@media(max-width:420px){svg.login-v2-wave{height:126px!important}}
+.login-v2-art{height:155px!important}
+
+/* 물결 아래로 15 + 홈 히어로 아이콘 오른쪽 10 */
+svg.login-v2-wave{bottom:-17px!important}
+.mast-main-home-hero .mast-home-hero-login-img{transform:translateX(-5px)!important}
+
+/* 홈 히어로 아이콘 오른쪽 10 추가 */
+.mast-main-home-hero .mast-home-hero-login-img{transform:translateX(5px)!important}
+
+/* 히어로/버튼 바 아래 '그림자 선' 경계 제거 */
+.admin-topbar{border-bottom:0!important;box-shadow:none!important}
+.weather-hero{box-shadow:none!important}
+.mast-quick-card{box-shadow:0 8px 22px rgba(55,88,135,.05)!important}
+
+/* 물결을 히어로 텍스트·아이콘 뒤로 (가리지 않게) */
+.login-v2-hero-copy{position:relative;z-index:3}
+.login-v2-art{z-index:2}
+.login-v2-wave{z-index:1!important}
+
+/* 회원 메인 히어로 아이콘 15% 축소 */
+.mast-main-home-hero .mast-home-hero-login-img{width:min(76vw,170px)!important}
+
+/* PageHeader 등록/추가 버튼 줄바꿈·찌그러짐 방지 */
+.page-header{gap:14px}
+.page-header>.button,.page-header>button{flex:0 0 auto;white-space:nowrap}

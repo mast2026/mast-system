@@ -141,12 +141,17 @@ export async function notifyPromotionTargets({ mission, assignees } = {}) {
   if (!resolvedAssignees) {
     const { data, error } = await client
       .from('promotion_assignment_status_view')
-      .select('member_id,member_name,gi,school')
+      .select('member_id,member_name,gi,school,status')
       .eq('mission_id', resolvedMission.id)
     throwIfError(error)
     resolvedAssignees = data || []
   }
   if (!resolvedAssignees.length) throw new Error('오늘 홍보 대상자가 없습니다.')
+
+  // 미제출자에게만 발송: 제출/승인/지각완료 상태는 제외
+  const SUBMITTED = ['submitted', 'approved', 'late']
+  const pending = resolvedAssignees.filter((a) => !SUBMITTED.includes(String(a.status ?? '').toLowerCase()))
+  if (!pending.length) throw new Error('미제출자가 없습니다. 대상자 전원이 인증을 완료했어요.')
 
   const { data: members, error: memberError } = await client
     .from(TABLES.members)
@@ -156,14 +161,14 @@ export async function notifyPromotionTargets({ mission, assignees } = {}) {
   const rows = []
   const unmatched = []
   const missionTitle = resolvedMission.title || '오늘 홍보 미션'
-  resolvedAssignees.forEach((assignee) => {
+  pending.forEach((assignee) => {
     const matched = matchTeamMatchingMember(assignee, members || [])
     if (matched) {
       rows.push({
         member_id: matched.id,
         type: 'promotion_target',
-        title: '오늘 홍보 미션 대상자입니다',
-        body: `${missionTitle} 게시글을 업로드하고 인증해 주세요.`,
+        title: '홍보 인증 미제출 안내',
+        body: `${missionTitle} — 아직 인증을 제출하지 않았어요. 오늘 안에 게시글을 올리고 인증해 주세요.`,
         href: '/promotion',
       })
     } else {

@@ -437,7 +437,7 @@ function MemberApp(props) {
     setTab(key);
   }
   return (
-    <div style={{ minHeight: embedded ? "auto" : "100vh", background: "linear-gradient(180deg,#eef8ff 0%,#fffdf2 48%,#f7faff 100%)", fontFamily: FONT, paddingBottom: embedded ? 0 : 84 }}>
+    <div style={{ minHeight: embedded ? "auto" : "100vh", background: "transparent", fontFamily: FONT, paddingBottom: embedded ? 0 : 84 }}>
       <div style={{ maxWidth: 480, margin: "0 auto", position: "relative" }}>
         {tab === "home" && <MemberHome session={props.session} onTab={setTab} />}
         {tab === "cert" && <MemberCert session={props.session} onTab={setTab} />}
@@ -542,8 +542,10 @@ function MemberHome(props) {
     var ordered = rotationOrderedMembers(sorted, todayPeople, historyRows);
     var idx = ordered.findIndex(function(m) { return m.id === targetId; });
     if (idx < 0) return null;
-    var baseDelay = todayPeople.length ? 3 : 0;
+    // 오늘 배정자는 ordered[0](0일)이므로, 다음 사람(idx 1)은 3일, 그다음 6일… (3일마다 1명)
+    var baseDelay = 0;
     if (!todayPeople.length && last) {
+      // 오늘 배정자가 아직 없으면, 마지막 배정일 기준 다음 순번까지 남은 일수로 시작
       baseDelay = Math.max(0, 3 - daysBetweenKST(last.mission_date, today));
     }
     return baseDelay + idx * 3;
@@ -592,7 +594,7 @@ function MemberHome(props) {
   }
 
   return (
-    <div style={{ padding: "14px 12px 18px", background: "linear-gradient(180deg,#eef8ff 0%,#fffdf2 48%,#f7faff 100%)", minHeight: "calc(100vh - 84px)" }}>
+    <div style={{ padding: "14px 12px 18px", background: "transparent", minHeight: "calc(100vh - 84px)" }}>
       {loading ? (
         <div style={homeCard({ textAlign: "center", color: SUB })}>불러오는 중...</div>
       ) : !mission ? (
@@ -611,7 +613,7 @@ function MemberHome(props) {
             <div style={{ marginTop: 9, padding: "0 14px", fontSize: fitFontSize(mission.title, 18, 13, 18, 6), lineHeight: "23px", color: "#071C59", fontWeight: 900, letterSpacing: "-0.03em", wordBreak: "keep-all", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{mission.title}</div>
             {/* 멘트: 미션 이름 아래로 */}
             <div style={{ marginTop: 8, fontSize: 22, lineHeight: "28px", fontWeight: 900, color: "#2F78F6", letterSpacing: "-0.04em", wordBreak: "keep-all" }}>{isAssignee ? "오늘 대상자입니다" : "오늘 대상자가 아니에요"}</div>
-            <button onClick={function() { props.onTab(isAssignee ? "cert" : "record"); }} style={{ marginTop: 13, width: "100%", maxWidth: 160, height: 44, border: "none", borderRadius: 15, background: "#0869F4", color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: FONT, boxShadow: "0 12px 24px rgba(8,105,244,0.2)", cursor: "pointer" }}>
+            <button onClick={function() { props.onTab(isAssignee ? "cert" : "record"); }} style={{ marginTop: 13, width: "100%", maxWidth: 140, height: 44, border: "none", borderRadius: 15, background: "linear-gradient(135deg,#4AA3FF,#0860EC)", color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: FONT, boxShadow: "0 12px 24px rgba(8,105,244,0.24)", cursor: "pointer", transform: "translate(57px, 10px)" }}>
               {isAssignee ? "인증하기" : "내 기록"} <span style={{ marginLeft: 6, fontSize: 22, lineHeight: 0 }}>›</span>
             </button>
           </div>
@@ -624,7 +626,7 @@ function MemberHome(props) {
             <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#FFE2B8", color: "#E05A00", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 900, flexShrink: 0 }}>!</div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 12, lineHeight: "17px", fontWeight: 900, color: "#C45100" }}>게시판 선택 주의</div>
-              <div style={{ fontSize: 12, lineHeight: "17px", fontWeight: 800, color: "#4A5568", wordBreak: "keep-all" }}>홍보글은 반드시 동아리/홍보 게시판에만 올려주세요. 다른 게시판 업로드는 신고 대상이 될 수 있습니다.</div>
+              <div style={{ fontSize: 12, lineHeight: "17px", fontWeight: 800, color: "#4A5568", wordBreak: "keep-all" }}>홍보글은 반드시 동아리/학회 게시판에만 올려주세요. 다른 게시판 업로드는 신고 대상이 될 수 있습니다.</div>
             </div>
           </div>
 
@@ -1218,7 +1220,7 @@ function AdminDashboard(props) {
     if (notifyBusy) return;
     setNotifyBusy(true); setNotifyMsg("");
     try {
-      var assigneeRows = assignments.map(function(a) { return { member_id: a.member_id, member_name: a.member_name, gi: a.gi, school: a.school }; });
+      var assigneeRows = assignments.map(function(a) { return { member_id: a.member_id, member_name: a.member_name, gi: a.gi, school: a.school, status: a.status }; });
       var result = await notifyPromotionTargets({ mission: mission, assignees: assigneeRows });
       var msg = result.sent + "명에게 알림을 보냈습니다.";
       if (result.unmatched && result.unmatched.length) msg += " (미매칭 " + result.unmatched.length + "명: 로그인 계정과 연결되지 않음)";

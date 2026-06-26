@@ -8,7 +8,7 @@ import { ACTIVITY_WEATHER_POINTS, ACTIVITY_WEATHER_PRESETS, gradeFor } from '../
 
 const BREAKDOWN_META = {
   promotion:  { label: '에타 홍보 미션',       desc: '홍보 미션 완료 이력',     baseWeight: 40 },
-  offline:    { label: 'OT·오프라인 참여',   desc: 'OT와 오프라인 참석 이력',  baseWeight: 30 },
+  offline:    { label: '출석',   desc: '오프라인·온라인 출석 이력',  baseWeight: 30 },
   peerReview: { label: '공모전 참여·협업', desc: '완주와 팀원 협업 경험',  baseWeight: 30 },
 }
 
@@ -60,7 +60,7 @@ export default function ActivityWeatherScreen() {
       <p>활동날씨는 평가가 아니라 팀 매칭과 협업을 돕는 참고 지표입니다.</p>
       <div>
         <span>반영 항목</span>
-        <b>OT 참여율 · 오프라인 참여율 · 에타 홍보 미션율 · 공모전 참여/완주율 · 협업 평가</b>
+        <b>출석률 · 에타 홍보 미션율 · 공모전 참여/완주율 · 협업 평가</b>
       </div>
       <div>
         <span>활용 범위</span>

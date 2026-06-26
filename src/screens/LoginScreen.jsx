@@ -159,10 +159,6 @@ export default function LoginScreen() {
       <Link className="login-v2-alt-btn solo" to="/admin-login">
         <ShieldCheck size={18} /> 관리자 로그인
       </Link>
-
-      <button type="button" className="login-v2-forgot" onClick={() => { setMessage(''); setInfo('비밀번호 재설정은 운영진에게 문의해 주세요. 이름·기수 확인 후 초기화해 드립니다.') }}>
-        비밀번호를 잊으셨나요?
-      </button>
     </section>
   </main>
 }

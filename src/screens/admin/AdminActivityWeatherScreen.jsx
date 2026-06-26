@@ -41,7 +41,7 @@ export default function AdminActivityWeatherScreen() {
           const b = row.activityWeather.breakdown.promotion
           return <ScoreDetailButton row={row} type="promotion" label={`${Math.round(b.points ?? 0)}/${b.maxPoints}`} onClick={setDetail} />
         }, sortValue: (row) => row.activityWeather.breakdown.promotion.points ?? -1 },
-        { key: 'offline', label: '오프라인', render: (row) => {
+        { key: 'offline', label: '출석', render: (row) => {
           const b = row.activityWeather.breakdown.offline
           return <ScoreDetailButton row={row} type="offline" label={`${Math.round(b.points ?? 0)}/${b.maxPoints}`} onClick={setDetail} />
         }, sortValue: (row) => row.activityWeather.breakdown.offline.points ?? -1 },
