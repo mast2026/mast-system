@@ -4784,3 +4784,9 @@ svg.login-v2-wave{bottom:-17px!important}
 /* PageHeader 등록/추가 버튼 줄바꿈·찌그러짐 방지 */
 .page-header{gap:14px}
 .page-header>.button,.page-header>button{flex:0 0 auto;white-space:nowrap}
+
+/* 로그인 폼을 물결보다 앞 레이어로 (물결이 '로그인' 글씨 가리는 문제 수정) */
+.login-v2-form{position:relative;z-index:5}
+
+/* 회원 메인 히어로: 날씨 아이콘 주위로 퍼지는 배경 그라데이션 */
+.mast-main-home-hero{background:radial-gradient(circle at 80% 52%, rgba(168,211,255,.62), rgba(220,238,255,.34) 40%, rgba(244,249,255,0) 72%)!important}
