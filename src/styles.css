@@ -596,7 +596,7 @@
 }
 .contest-main-hero img{right:-2px!important}
 .weather-hero .weather-size-hero{
-  right:-24px!important;
+  right:6px!important;
 }
 
 /* Application status cards */
@@ -691,7 +691,7 @@
   .mast-home-hero{margin:-8px -16px 4px!important;padding:22px 16px 16px!important}
   .contest-main-hero{margin:-8px -16px 8px!important;padding:20px 124px 18px 16px!important;overflow:hidden!important}
   .contest-main-hero img{right:-30px!important}
-  .weather-hero .weather-size-hero{right:-24px!important}
+  .weather-hero .weather-size-hero{right:6px!important}
   .application-status-actions .button{width:100%}
   .monthly-schedule-card{grid-template-columns:68px minmax(0,1fr)}
   .monthly-calendar-visual b{font-size:25px}
@@ -4606,10 +4606,10 @@ svg.login-v2-wave{
 .mast-home-hero-weather{
   position:absolute!important;
   z-index:1!important;
-  right:6%!important;
+  right:12%!important;
   top:50%!important;
   bottom:auto!important;
-  transform:translate(-20px,calc(-50% - 14px))!important;
+  transform:translate(-6px,calc(-50% - 10px))!important;
   width:160px!important;
   height:160px!important;
   display:grid!important;
@@ -4625,19 +4625,33 @@ svg.login-v2-wave{
 }
 .mast-home-hero-weather .weather-image-icon img{
   filter:none!important;
-  transform:scale(1.05)!important;
+  /* .mast-home-hero img 규칙(cover/126%)이 날씨 아이콘에 새어들어와 잘리던 것을 차단 */
+  object-fit:contain!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:100%!important;
+  max-height:100%!important;
+  transform:scale(1)!important;
 }
+/* 무지개·맑음은 가로로 넓어 살짝만 줄여 다른 날씨와 크기 맞춤 */
+.mast-home-hero-weather .weather-rainbow img{transform:scale(1.38)!important}
+.mast-home-hero-weather .weather-sunny img{transform:scale(0.95)!important}
+/* 박스가 이미지를 사각형으로 자르지 않도록 overflow 해제 */
+.mast-home-hero-weather,
+.mast-home-hero-weather .weather-icon,
+.mast-home-hero-weather .weather-size-hero,
+.mast-home-hero-weather .weather-image-icon{overflow:visible!important}
 .mast-main-home-hero .mast-home-hero-image{
   display:none!important;
 }
 @media(max-width:600px){
   .mast-home-hero-weather{
-    right:5%!important;
+    right:10%!important;
     top:50%!important;
     bottom:auto!important;
-    transform:translate(-16px,calc(-50% - 12px))!important;
-    width:128px!important;
-    height:128px!important;
+    transform:translate(-6px,calc(-50% - 8px))!important;
+    width:138px!important;
+    height:138px!important;
   }
 }
 svg.login-v2-wave path{

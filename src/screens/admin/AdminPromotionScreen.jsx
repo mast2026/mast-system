@@ -1,6 +1,6 @@
 import { AdminApp } from '../../EtaPromotionLegacy.jsx'
 import { useAuth } from '../../context/AuthContext'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 const tabMap = {
   legacy: 'dashboard',
@@ -19,6 +19,7 @@ const tabMap = {
 
 export default function AdminPromotionScreen() {
   const { member, logout } = useAuth()
+  const navigate = useNavigate()
   const [params] = useSearchParams()
   const initialTab = tabMap[params.get('tab')] || 'dashboard'
   const legacySession = {
@@ -33,6 +34,6 @@ export default function AdminPromotionScreen() {
   }
 
   return <section className="admin-promotion-only">
-    <AdminApp session={legacySession} onLogout={logout} embedded initialTab={initialTab} />
+    <AdminApp session={legacySession} onLogout={logout} onExitToAdmin={() => navigate('/admin')} embedded initialTab={initialTab} />
   </section>
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Home, Plus } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
 import Modal from '../../components/Modal'
 import AdminTable from '../../components/AdminTable'
@@ -30,6 +31,9 @@ export default function AdminAwardsScreen() {
   if (q.loading) return <LoadingState />
   if (q.error) return <ErrorState error={q.error} retry={q.retry} />
   return <>
+    <div style={{ marginBottom: 12 }}>
+      <Link to="/admin" className="button secondary small"><Home size={16} /> 관리자 메인</Link>
+    </div>
     <PageHeader title="수상 관리" description="팀별 공모전 수상 결과를 등록하고 활동날씨 성과 점수에 반영합니다." action={<button className="button primary" onClick={() => setEditing({ team_id: '', contest_id: '', award_result: '' })}><Plus/>등록</button>} />
     {notice && <div className="form-notice">{notice}</div>}
     <AdminTable rows={q.data.awards} searchPlaceholder="수상 결과, 팀, 공모전 검색" getSearchText={(row) => `${row.award_result} ${row.team?.introduction} ${row.team?.leader?.name} ${row.contest?.title}`}

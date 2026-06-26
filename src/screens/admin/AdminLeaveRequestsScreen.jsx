@@ -31,8 +31,8 @@ export default function AdminLeaveRequestsScreen() {
   const rows = q.data ?? []
 
   return <>
-    <div className="admin-inner-tabs" style={{ marginBottom: 12 }}>
-      <Link className="admin-icon-button mini" to="/admin" aria-label="관리자 홈"><Home /></Link>
+    <div style={{ marginBottom: 12 }}>
+      <Link to="/admin" className="button secondary small"><Home size={16} /> 관리자 메인</Link>
     </div>
     <PageHeader title="팀 탈퇴 신청" description="팀원이 신청한 탈퇴를 승인하거나 반려합니다. 승인 시 팀에서 제외됩니다." />
     {notice && <div className="form-notice">{notice}</div>}

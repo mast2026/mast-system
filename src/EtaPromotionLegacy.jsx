@@ -1131,7 +1131,7 @@ function AdminApp(props) {
               {!embedded && <img src={mastLogo} alt="MAST" style={{ width: 86, height: "auto", display: "block" }} />}
               <span style={{ fontSize: 11, fontWeight: 900, color: "#0869F4", background: "#E8F0FE", borderRadius: 999, padding: "4px 8px", whiteSpace: "nowrap" }}>관리자</span>
             </div>
-            {embedded && <button onClick={function() { window.location.href = "/admin"; }} style={{ border: "1px solid #D7E7F6", background: "rgba(255,255,255,0.76)", color: "#0869F4", borderRadius: 999, cursor: "pointer", fontFamily: FONT, fontSize: 11, fontWeight: 900, padding: "6px 10px", whiteSpace: "nowrap" }}>관리자 메인</button>}
+            {embedded && <button onClick={function() { if (props.onExitToAdmin) { props.onExitToAdmin(); } else { window.location.href = "/admin"; } }} style={{ border: "1px solid #D7E7F6", background: "rgba(255,255,255,0.76)", color: "#0869F4", borderRadius: 999, cursor: "pointer", fontFamily: FONT, fontSize: 11, fontWeight: 900, padding: "6px 10px", whiteSpace: "nowrap" }}>관리자 메인</button>}
             {!embedded && <button onClick={props.onLogout} style={btnSmall({ width: "auto", background: "#fff", color: SUB, border: "1px solid #E5EAF2", borderRadius: 14, whiteSpace: "nowrap", padding: "7px 11px", fontSize: 11 })}>로그아웃</button>}
           </div>
           <div style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 5, background: "#EEF3FB", borderRadius: 16, padding: 4 }}>

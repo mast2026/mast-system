@@ -120,6 +120,42 @@ function calcOfflineScore(row, events = []) {
   return Math.max(attendanceScore ?? 0, eventScore ?? 0)
 }
 
+// 출석 30점 = 오프라인 25점 + 온라인 5점 (모임 유형별 출석률 가중). 기본 점수 없이 실제 출석률로만 계산.
+// 반환값은 0~100 스케일(calculateActivityWeather가 *30 적용). 출석 데이터가 없으면 null.
+function calcAttendanceByMode(externalId, sessions, records) {
+  if (externalId === null || externalId === undefined || externalId === '') return null
+  const ext = String(externalId)
+  const offlineSessions = (sessions ?? []).filter((s) => String(s.session_mode ?? 'offline') !== 'online')
+  const onlineSessions = (sessions ?? []).filter((s) => String(s.session_mode) === 'online')
+  if (!offlineSessions.length && !onlineSessions.length) return null
+  const attended = new Set((records ?? [])
+    .filter((r) => String(r.member_id) === ext && ['present', 'late', 'excused'].includes(String(r.status)))
+    .map((r) => String(r.session_id)))
+  const rateOf = (list) => list.length ? (list.filter((s) => attended.has(String(s.id))).length / list.length) * 100 : null
+  const offlineRate = rateOf(offlineSessions)
+  const onlineRate = rateOf(onlineSessions)
+  if (offlineRate === null && onlineRate === null) return null
+  const points = ((offlineRate ?? 0) / 100 * 25) + ((onlineRate ?? 0) / 100 * 5)
+  return (points / 30) * 100
+}
+
+function targetsGeneration(targetGenerations, gen) {
+  if (!targetGenerations) return false
+  return String(targetGenerations).split(',').map((x) => x.replace(/[^0-9]/g, '')).filter(Boolean).includes(gen)
+}
+
+// 신입 기수는 자기 기수 OT가 예정(미래)돼 있고 아직 안 열렸으면 출석을 기본치(100%)로 반영.
+// OT 날짜가 지나면(과거 OT 존재) 실제 출석률로 전환. OT가 정의 안 된 기존 기수는 false.
+function isPreOt(memberGeneration, sessions, now = Date.now()) {
+  const gen = String(memberGeneration ?? '').replace(/[^0-9]/g, '')
+  if (!gen) return false
+  const otForGen = (sessions ?? []).filter((s) => s.is_orientation && targetsGeneration(s.target_generations, gen))
+  if (!otForGen.length) return false
+  const hasFuture = otForGen.some((s) => s.starts_at && new Date(s.starts_at).getTime() > now)
+  const hasPast = otForGen.some((s) => s.starts_at && new Date(s.starts_at).getTime() <= now)
+  return hasFuture && !hasPast
+}
+
 // 동료평가 점수 계산 (team_matching_peer_reviews)
 function calcPeerReviewScore(reviews) {
   const approvedReviews = (reviews ?? []).filter(isApprovedPeerReview)
@@ -162,7 +198,7 @@ export async function getMemberActivityWeather(member) {
   const supabase = requireSupabase()
   const memberId = member?.id ?? member  // 하위 호환
 
-  const [promotionRes, attendanceRes, peerRes, peerSummaryRes, eventRes] = await Promise.all([
+  const [promotionRes, attendanceRes, peerRes, peerSummaryRes, eventRes, sessionRes, recordRes] = await Promise.all([
     // 에타 홍보: promotion_member_progress_view의 member_id가 UUID일 수도, 정수 id 참조일 수도 있어 후보를 넓게 매칭합니다.
     supabase.from(TABLES.progressView).select('*'),
 
@@ -173,12 +209,20 @@ export async function getMemberActivityWeather(member) {
     supabase.from(TABLES.peerReviews).select('*').eq('reviewee_id', memberId),
     safeSelectPeerReviewSummary(),
     supabase.from(TABLES.scoreEvents).select('*').eq('member_id', memberId).eq('verified', true),
+    supabase.from('activity_sessions').select('id,session_mode,is_orientation,target_generations,starts_at'),
+    supabase.from('activity_attendance_records').select('member_id,session_id,status'),
   ])
 
   const promotionRow = findPromotionRow(promotionRes.data ?? [], member)
   const attendanceRow = findAttendanceRow(attendanceRes.data ?? [], member, promotionRow)
   const promotionScore = calcPromotionScore(promotionRow)
-  const offlineScore = calcOfflineScore(attendanceRow, eventRes.data)
+  const externalId = member?.mast_member_id ?? promotionRow?.member_id ?? attendanceRow?.member_id
+  const allSessionsData = sessionRes.error ? [] : (sessionRes.data ?? [])
+  const byMode = calcAttendanceByMode(externalId, allSessionsData, recordRes.error ? [] : recordRes.data)
+  // 신입 기수 OT 전: 출석 기본치 100%. 그 외: 모임유형별 출석률(없으면 기존 방식)
+  const offlineScore = isPreOt(member?.generation, allSessionsData)
+    ? 100
+    : (byMode !== null ? byMode : calcOfflineScore(attendanceRow, eventRes.data))
   const peerSummaryRow = findPeerSummaryRow(peerSummaryRes.data ?? [], memberId)
   const peerReviewScore = normalizePercent(peerSummaryRow?.peer_review_score ?? peerSummaryRow?.average_score ?? peerSummaryRow?.score) ?? calcPeerReviewScore(peerRes.data)
 
@@ -201,12 +245,14 @@ export async function getMemberActivityWeather(member) {
 export async function getAllActivityWeather(members) {
   const supabase = requireSupabase()
 
-  const [promoRes, attendanceRes, peerRes, peerSummaryRes, eventRes] = await Promise.all([
+  const [promoRes, attendanceRes, peerRes, peerSummaryRes, eventRes, sessionRes, recordRes] = await Promise.all([
     supabase.from(TABLES.progressView).select('*'),
     supabase.from(TABLES.attendanceSummary).select('*'),
     supabase.from(TABLES.peerReviews).select('*'),
     safeSelectPeerReviewSummary(),
     supabase.from(TABLES.scoreEvents).select('*').eq('verified', true),
+    supabase.from('activity_sessions').select('id,session_mode,is_orientation,target_generations,starts_at'),
+    supabase.from('activity_attendance_records').select('member_id,session_id,status'),
   ])
 
   const allPromo = promoRes.data ?? []
@@ -214,6 +260,8 @@ export async function getAllActivityWeather(members) {
   const allPeer = peerRes.data ?? []
   const allPeerSummary = peerSummaryRes.data ?? []
   const allEvents = eventRes.data ?? []
+  const allSessions = sessionRes.error ? [] : (sessionRes.data ?? [])
+  const allRecords = recordRes.error ? [] : (recordRes.data ?? [])
 
   return members.map((member) => {
     const testWeather = testWeatherResultForMember(member)
@@ -227,12 +275,15 @@ export async function getAllActivityWeather(members) {
     const peerReviews = allPeer.filter((r) => Number(r.reviewee_id) === Number(member.id))
     const peerSummaryRow = findPeerSummaryRow(allPeerSummary, member.id)
     const scoreEvents = allEvents.filter((event) => Number(event.member_id) === Number(member.id))
+    const externalId = member?.mast_member_id ?? promoRow?.member_id ?? attendanceRow?.member_id
+    const byMode = calcAttendanceByMode(externalId, allSessions, allRecords)
+    const preOt = isPreOt(member?.generation, allSessions)
 
     return {
       ...member,
       activityWeather: calculateActivityWeather({
         promotionScore: calcPromotionScore(promoRow),
-        offlineScore: calcOfflineScore(attendanceRow, scoreEvents),
+        offlineScore: preOt ? 100 : (byMode !== null ? byMode : calcOfflineScore(attendanceRow, scoreEvents)),
         peerReviewScore: normalizePercent(peerSummaryRow?.peer_review_score ?? peerSummaryRow?.average_score ?? peerSummaryRow?.score) ?? calcPeerReviewScore(peerReviews),
       }),
       raw: {

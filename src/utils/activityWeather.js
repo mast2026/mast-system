@@ -37,8 +37,8 @@ export function calculateActivityWeather({ promotionScore = null, offlineScore =
   const used = Object.fromEntries(Object.keys(raw).map((key) => [key, raw[key] !== null && raw[key] !== undefined && raw[key] !== '' && Number.isFinite(Number(raw[key]))]))
   const normalized = {
     promotion: used.promotion ? clampPercent(raw.promotion) : null,
-    // 출석/OT 데이터가 아직 없는 현재 단계에서는 결석으로 보지 않고 기본 출석 30점을 반영합니다.
-    offline: used.offline ? clampPercent(raw.offline) : 100,
+    // 기본 점수 없이 실제 출석률로만 반영합니다. (오프라인 25 + 온라인 5 = 30점, 출석 데이터가 없으면 0점)
+    offline: used.offline ? clampPercent(raw.offline) : 0,
     peerReview: used.peerReview ? clampPercent(raw.peerReview) : null,
   }
   const points = {

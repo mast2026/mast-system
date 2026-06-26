@@ -525,7 +525,9 @@ export async function createAttendanceSession(values) {
     attendance_code: values.attendance_code,
     attendance_open_at: toIso(values.attendance_open_at),
     attendance_close_at: toIso(values.attendance_close_at),
-    base_points: values.base_points ? Number(values.base_points) : 1,
+    session_mode: values.session_mode || 'offline',
+    is_orientation: Boolean(values.is_orientation),
+    target_generations: values.is_orientation ? (values.target_generations || '') : null,
   }))
 }
 
@@ -540,7 +542,9 @@ export async function updateAttendanceSession(id, values) {
     attendance_code: values.attendance_code,
     attendance_open_at: toIso(values.attendance_open_at),
     attendance_close_at: toIso(values.attendance_close_at),
-    base_points: values.base_points ? Number(values.base_points) : 1,
+    session_mode: values.session_mode || 'offline',
+    is_orientation: Boolean(values.is_orientation),
+    target_generations: values.is_orientation ? (values.target_generations || '') : null,
   }))
 }
 

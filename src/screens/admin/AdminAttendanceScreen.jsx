@@ -222,7 +222,7 @@ export default function AdminAttendanceScreen() {
     />}
 
     {tab === 'history' && <section className="admin-list-panel">
-      <header><h2>일정 내역</h2><button type="button" onClick={() => setCreating(true)}><Plus /> 일정 추가</button></header>
+      <header><h2>일정 내역</h2><button type="button" onClick={() => setCreating(true)} aria-label="일정 추가"><Plus /></button></header>
       <div className="admin-session-list">
         {sessions.length ? sessions.map((session) => <SessionCard key={session.id} session={session} onEdit={setEditing} onDelete={removeSession} />) : <div className="admin-empty-card">등록된 일정 내역이 없습니다.</div>}
       </div>
@@ -342,7 +342,9 @@ function AttendanceSessionForm({ initial, onSubmit, onCancel, busy }) {
     attendance_code: initial?.attendance_code || '',
     attendance_open_at: toLocalInput(initial?.attendance_open_at),
     attendance_close_at: toLocalInput(initial?.attendance_close_at),
-    base_points: initial?.base_points ?? 1,
+    session_mode: initial?.session_mode || 'offline',
+    is_orientation: initial?.is_orientation || false,
+    target_generations: initial?.target_generations || '',
   }))
   const set = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
@@ -353,12 +355,16 @@ function AttendanceSessionForm({ initial, onSubmit, onCancel, busy }) {
       <Field label="시작 일시" required><input type="datetime-local" value={form.starts_at} onChange={(event) => set('starts_at', event.target.value)} required /></Field>
       <Field label="종료 일시"><input type="datetime-local" value={form.ends_at} onChange={(event) => set('ends_at', event.target.value)} /></Field>
       <Field label="상태"><select value={form.status} onChange={(event) => set('status', event.target.value)}><option value="scheduled">예정</option><option value="open">출석 가능</option><option value="closed">마감</option></select></Field>
-      <Field label="기본 점수"><input type="number" min="0" value={form.base_points} onChange={(event) => set('base_points', event.target.value)} /></Field>
+      <Field label="모임 유형"><select value={form.session_mode} onChange={(event) => set('session_mode', event.target.value)}><option value="offline">오프라인</option><option value="online">온라인</option></select></Field>
       <Field label="출석코드"><input value={form.attendance_code} onChange={(event) => set('attendance_code', event.target.value)} placeholder="비워두면 나중에 입력" /></Field>
       <Field label="코드 오픈"><input type="datetime-local" value={form.attendance_open_at} onChange={(event) => set('attendance_open_at', event.target.value)} /></Field>
       <Field label="코드 마감"><input type="datetime-local" value={form.attendance_close_at} onChange={(event) => set('attendance_close_at', event.target.value)} /></Field>
     </div>
     <label className="check-field"><input type="checkbox" checked={form.attendance_code_enabled} onChange={(event) => set('attendance_code_enabled', event.target.checked)} /><span>출석코드 사용</span></label>
+    <label className="check-field"><input type="checkbox" checked={form.is_orientation} onChange={(event) => set('is_orientation', event.target.checked)} /><span>OT(오리엔테이션) 모임</span></label>
+    {form.is_orientation && <Field label="OT 대상 기수 (쉼표로, 예: 1,2 → 2기 OT지만 1기도 필참)">
+      <input value={form.target_generations} onChange={(event) => set('target_generations', event.target.value)} placeholder="예: 2 또는 1,2" />
+    </Field>}
     <FormActions submitting={busy} submitLabel={initial?.id ? '모임 수정' : '모임 등록'} onCancel={onCancel} />
   </form>
 }
