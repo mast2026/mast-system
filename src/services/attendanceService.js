@@ -144,8 +144,9 @@ export async function submitAttendance({ currentMember, sessionId, code }) {
 
 // 출석 시각을 정시 기준과 비교해 present / 지각(30분 이내, -1) / 지각(30분 초과, -3) 으로 분류
 export function classifyAttendance(session, now = Date.now()) {
-  const ontimeRaw = session?.ontime_at ?? session?.starts_at ?? null
-  const ontimeMs = ontimeRaw ? new Date(ontimeRaw).getTime() : null
+  // 지각 판정은 관리자가 '출석 정시 마감(ontime_at)'을 명시한 모임에서만 적용합니다.
+  // 정시를 설정하지 않은 모임은 출석코드 제출 시 항상 '출석'으로 처리합니다.
+  const ontimeMs = session?.ontime_at ? new Date(session.ontime_at).getTime() : null
   if (ontimeMs == null || Number.isNaN(ontimeMs)) {
     return { status: 'present', points: 0, label: '출석', minutesLate: 0 }
   }

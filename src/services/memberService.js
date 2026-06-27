@@ -76,10 +76,12 @@ export async function loginFirstTime(name, school, generation, newPassword, conf
   const alreadySet = await checkHasPassword(member.id)
   if (alreadySet) throw new Error('이미 비밀번호가 설정된 계정입니다. 이름과 비밀번호로 로그인하세요.')
 
-  const schoolMatch = normalizeStr(member.school) === normalizeStr(school)
+  // DB에 학교/기수가 있으면 일치 검사, 비어 있으면 입력값을 그대로 인정(가입 막힘 방지)
+  const dbSchool = normalizeStr(member.school)
   const genA = extractNum(member.generation)
   const genB = extractNum(generation)
-  const generationMatch = genA !== '' && genB !== '' && genA === genB
+  const schoolMatch = !dbSchool || dbSchool === normalizeStr(school)
+  const generationMatch = genA === '' || (genB !== '' && genA === genB)
   if (!schoolMatch || !generationMatch) throw new Error('학교 또는 기수 정보가 일치하지 않습니다.')
 
   if (!newPassword || newPassword.length < 4) throw new Error('비밀번호는 4자 이상 입력하세요.')

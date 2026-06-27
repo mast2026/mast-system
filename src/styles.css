@@ -4928,3 +4928,17 @@ svg.login-v2-wave{bottom:-17px!important}
 /* 동료평가: 내림차순 제약(비활성 별점) + 안내 */
 .star-rating button.disabled{opacity:.28;cursor:not-allowed}
 .rating-cap-note{display:block;margin-top:6px;font-size:11px;color:#e0823a;font-weight:600}
+
+/* 활동날씨: 점수 반영 항목 안내 (회원 화면, 개인 내역 대신) */
+.score-guide-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.score-guide-col{background:#fff;border:1px solid #eef2f8;border-radius:16px;padding:12px 14px}
+.score-guide-col h3{margin:0 0 8px;font-size:13px;font-weight:800}
+.score-guide-col.gain h3{color:#1f9d57}
+.score-guide-col.deduct h3{color:#e0564f}
+.score-guide-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.score-guide-col li{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;color:#3a455c}
+.score-guide-col li em{font-style:normal;font-weight:800}
+.score-guide-col.gain li em{color:#1f9d57}
+.score-guide-col.deduct li em{color:#e0564f}
+.score-guide-note{margin:10px 2px 0;font-size:11.5px;color:#8a97a6}
+@media(max-width:480px){.score-guide-cols{grid-template-columns:1fr}}

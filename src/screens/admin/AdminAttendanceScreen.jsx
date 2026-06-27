@@ -358,7 +358,7 @@ function AttendanceSessionForm({ initial, onSubmit, onCancel, busy }) {
       <Field label="장소"><input value={form.location} onChange={(event) => set('location', event.target.value)} placeholder="예: 중앙대학교 310관" /></Field>
       <Field label="시작 일시" required><input type="datetime-local" value={form.starts_at} onChange={(event) => set('starts_at', event.target.value)} required /></Field>
       <Field label="종료 일시"><input type="datetime-local" value={form.ends_at} onChange={(event) => set('ends_at', event.target.value)} /></Field>
-      <Field label="출석 정시 마감 (이후 지각·비우면 시작 일시 기준)"><input type="datetime-local" value={form.ontime_at} onChange={(event) => set('ontime_at', event.target.value)} /></Field>
+      <Field label="출석체크 기준 시각 (이 시각 기준 30분 이내 지각 −1·초과 −3, 비우면 미적용)"><input type="datetime-local" value={form.ontime_at} onChange={(event) => set('ontime_at', event.target.value)} /></Field>
       <Field label="상태"><select value={form.status} onChange={(event) => set('status', event.target.value)}><option value="scheduled">예정</option><option value="open">출석 가능</option><option value="closed">마감</option></select></Field>
       <Field label="모임 유형"><select value={form.session_mode} onChange={(event) => set('session_mode', event.target.value)}><option value="offline">오프라인</option><option value="online">온라인</option></select></Field>
       <Field label="출석코드"><input value={form.attendance_code} onChange={(event) => set('attendance_code', event.target.value)} placeholder="비워두면 나중에 입력" /></Field>

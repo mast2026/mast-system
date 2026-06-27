@@ -4,7 +4,10 @@ import { ErrorState, LoadingState } from '../components/States'
 import { useAuth } from '../context/AuthContext'
 import useQuery from '../hooks/useQuery'
 import { getMemberActivityWeather } from '../services/activityWeatherService'
-import { ACTIVITY_WEATHER_PRESETS, WEATHER_BASE_SCORE, gradeFor } from '../utils/activityWeather'
+import { ACTIVITY_WEATHER_PRESETS, SCORE_RUBRIC, WEATHER_BASE_SCORE, gradeFor } from '../utils/activityWeather'
+
+const GAINS = SCORE_RUBRIC.filter((item) => item.group === 'gain')
+const DEDUCTS = SCORE_RUBRIC.filter((item) => item.group === 'deduct')
 
 export default function ActivityWeatherScreen() {
   const { member } = useAuth()
@@ -25,8 +28,6 @@ export default function ActivityWeatherScreen() {
   const d = previewPreset ? makePreviewWeather(previewPreset) : q.data
   const { score, grade, weatherType, isCollectingData, message, exempt } = d
   const base = d.base ?? WEATHER_BASE_SCORE
-  const events = d.events ?? []
-  const totalDelta = d.totalDelta ?? 0
   const weatherTitle = exempt ? '미적용' : isCollectingData ? '날씨 확인 중' : grade
   const personalMessage = exempt
     ? '지도교수·고문은 활동날씨 대상이 아니에요.'
@@ -64,27 +65,26 @@ export default function ActivityWeatherScreen() {
 
     {!exempt && <section className="weather-breakdown">
       <div className="section-heading">
-        <h2>점수 내역</h2>
-        <span>{base}점 시작 · 가감점 {totalDelta >= 0 ? '+' : ''}{totalDelta}</span>
+        <h2>점수 반영 항목 안내</h2>
+        <span>{base}점에서 시작 · 0~100</span>
       </div>
 
-      <div className="score-ledger">
-        <div className="score-ledger-row base">
-          <b>시작 점수</b>
-          <em>{base}</em>
+      <div className="score-guide-cols">
+        <div className="score-guide-col gain">
+          <h3>가산 항목</h3>
+          <ul>
+            {GAINS.map((it) => <li key={it.key}><span>{it.label}</span><em>+{it.points}</em></li>)}
+            <li><span>동료평가 항목 1위</span><em>+1</em></li>
+          </ul>
         </div>
-        {events.map((ev, i) => (
-          <div className="score-ledger-row" key={ev.id ?? i}>
-            <b>{ev.label}</b>
-            <em className={ev.points >= 0 ? 'up' : 'down'}>{ev.points >= 0 ? '+' : ''}{ev.points}</em>
-          </div>
-        ))}
-        {!events.length && <div className="score-ledger-empty">아직 반영된 가감점이 없어요. 활동을 시작하면 여기에 쌓입니다.</div>}
-        <div className="score-ledger-row total">
-          <b>현재 점수</b>
-          <em>{score}<small>/100</small></em>
+        <div className="score-guide-col deduct">
+          <h3>감점 항목</h3>
+          <ul>
+            {DEDUCTS.map((it) => <li key={it.key}><span>{it.label}</span><em>{it.points}</em></li>)}
+          </ul>
         </div>
       </div>
+      <p className="score-guide-note">실제 반영 내역은 운영진이 관리하며, 위 항목 기준으로 가산·감점됩니다.</p>
     </section>}
 
     {!exempt && <div className="weather-tip">
