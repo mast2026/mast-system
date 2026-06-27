@@ -4889,3 +4889,42 @@ svg.login-v2-wave{bottom:-17px!important}
 
 /* 운영진 출석 현황: 체크 시각 표시 */
 .attendance-roster-row .attendance-check-time{display:block;margin-top:2px;font-size:11px;color:#3977ff;font-weight:700}
+
+/* ===== 회원 관리: 일괄 점수 부여 ===== */
+.bulk-score-toggle{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.bulk-score-panel{margin:12px 0 6px;padding:14px;border:1px solid #e3ebf6;border-radius:16px;background:#f7faff;display:flex;flex-direction:column;gap:10px}
+.bulk-score-step{font-size:13px;font-weight:800;color:#2a3550;display:flex;align-items:center;gap:8px}
+.bulk-step-num{width:20px;height:20px;border-radius:50%;background:#3977ff;color:#fff;font-size:12px;display:inline-flex;align-items:center;justify-content:center;font-weight:800}
+.rubric-btn.active{border-color:#3977ff!important;background:#eaf2ff!important;color:#0b59d0}
+.bulk-score-actionbar{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px dashed #d8e2f0;padding-top:10px}
+.bulk-score-actionbar span{font-size:13px;color:#46506a}
+.bulk-score-actionbar b{color:#0b59d0}
+.admin-member-thin-list.selecting button{cursor:pointer}
+.admin-member-thin-list.selecting button.is-checked{background:#eaf2ff;border-color:#bcd4ff}
+.bulk-check{width:22px;height:22px;border-radius:7px;border:1.5px solid #c2ccdc;background:#fff;display:inline-flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0}
+.admin-member-thin-list.selecting button.is-checked .bulk-check{background:#3977ff;border-color:#3977ff}
+
+/* 일괄 점수 모드: 체크/아바타/이름 3칸으로 그리드 교정 (배지 pill 스타일 덮어쓰기) */
+.admin-member-thin-list.selecting>button{grid-template-columns:26px 40px minmax(0,1fr)!important}
+.admin-member-thin-list.selecting>button>span.bulk-check{padding:0!important;background:#fff!important;color:#fff!important;width:22px;height:22px;border-radius:7px;border:1.5px solid #c2ccdc;display:inline-flex;align-items:center;justify-content:center}
+.admin-member-thin-list.selecting>button.is-checked>span.bulk-check{background:#3977ff!important;border-color:#3977ff!important}
+
+/* 홈 히어로 맑음(화창) 아이콘 왼쪽 20·위 20 (16/15 → -4/-5) */
+.mast-home-hero-weather .weather-sunny.weather-size-hero{transform:translate(-4px,-5px) scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* 회원 상세 모달: 활동 점수 부여 패널 */
+.admin-member-score-panel{margin:14px 0;padding:14px;border:1px solid #e6eef9;border-radius:16px;background:#f8fbff;display:flex;flex-direction:column;gap:10px}
+.member-score-summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.member-score-summary span{font-size:12px;color:#6d7f89}
+.member-score-summary span.up{color:#1f9d57;font-weight:700}
+.member-score-summary span.down{color:#e0564f;font-weight:700}
+.member-score-summary b{margin-left:auto;font-size:18px;color:#1b2a4a}
+.member-score-summary b small{font-size:11px;color:#9aa7ad;font-weight:600}
+.member-score-notice{font-size:12px;color:#0b59d0;background:#eaf2ff;border-radius:9px;padding:7px 10px}
+
+/* 홈 구름낀해 아이콘 왼쪽 20·위 20 (81/65 → 61/45) */
+.mast-home-hero-weather .weather-partly_sunny.weather-size-hero{transform:translate(61px,45px) scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* 동료평가: 내림차순 제약(비활성 별점) + 안내 */
+.star-rating button.disabled{opacity:.28;cursor:not-allowed}
+.rating-cap-note{display:block;margin-top:6px;font-size:11px;color:#e0823a;font-weight:600}

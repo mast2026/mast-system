@@ -164,20 +164,24 @@ export async function submitPeerReview(teamId, member, values) {
   const revieweeId = Number(values.reviewee_id)
   if (!context.targets.some((target) => Number(target.id) === revieweeId)) throw new Error('평가할 수 없는 팀원입니다.')
   const capabilities = await detectPeerReviewCapabilities()
-  const contribution = normalizeRating(values.contribution, '기여도')
   const plainComment = values.comment?.trim() || ''
+
+  // 항목 매핑 — 존중→participation, 아이디어→collaboration, 융통성→communication
+  const respect = normalizeRating(values.participation, '존중')
+  const idea = normalizeRating(values.collaboration, '아이디어')
+  const flexibility = normalizeRating(values.communication, '융통성')
 
   const payload = {
     team_id: Number(teamId),
     reviewer_id: Number(member.id),
     reviewee_id: revieweeId,
-    participation: normalizeRating(values.participation, '참여도'),
-    sincerity: normalizeRating(values.sincerity, '책임감'),
-    collaboration: normalizeRating(values.collaboration, '협업 태도'),
-    communication: normalizeRating(values.communication, '소통'),
-    comment: capabilities.contribution ? (plainComment || null) : `[기여도:${contribution}]${plainComment ? `\n${plainComment}` : ''}`,
+    participation: respect,
+    collaboration: idea,
+    communication: flexibility,
+    sincerity: respect, // 미사용 컬럼(NOT NULL 대비 채움)
+    comment: plainComment || null,
   }
-  if (capabilities.contribution) payload.contribution = contribution
+  if (capabilities.contribution) payload.contribution = respect // 미사용 컬럼 채움
   const { error } = await requireSupabase().from(TABLES.peerReviews).insert(payload)
   if (error) throw error
 }

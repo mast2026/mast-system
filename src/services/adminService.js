@@ -533,6 +533,63 @@ export async function deleteScoreEvent(id) {
   return true
 }
 
+// 동료평가 항목(존중/아이디어/융통성). DB 컬럼 재활용 매핑.
+const PEER_TOP_ITEMS = [
+  { key: 'peer_top_respect', col: 'participation', label: '존중' },
+  { key: 'peer_top_idea', col: 'collaboration', label: '아이디어' },
+  { key: 'peer_top_flex', col: 'communication', label: '융통성' },
+]
+
+// 팀 안에서 항목별로 팀원이 매긴 평균이 가장 높은 회원에게 +1점.
+// 관리자 '결과 반영' 버튼에서 호출. 다시 누르면 기존 동료평가 가점을 지우고 재계산합니다.
+export async function applyPeerReviewAwards() {
+  const client = requireSupabase()
+  const { data: reviews, error } = await client.from(TABLES.peerReviews).select('*')
+  throwIfError(error)
+
+  // 기존 동료평가 1위 가점 이벤트 제거(중복 방지)
+  await client.from(TABLES.scoreEvents).delete().in('event_type', PEER_TOP_ITEMS.map((i) => i.key))
+
+  const byTeam = new Map()
+  for (const r of reviews ?? []) {
+    const t = String(r.team_id)
+    if (!byTeam.has(t)) byTeam.set(t, [])
+    byTeam.get(t).push(r)
+  }
+
+  const events = []
+  let winners = 0
+  for (const teamReviews of byTeam.values()) {
+    for (const item of PEER_TOP_ITEMS) {
+      const agg = new Map() // revieweeId -> { sum, count }
+      for (const r of teamReviews) {
+        const v = Number(r[item.col])
+        if (!Number.isFinite(v)) continue
+        const id = Number(r.reviewee_id)
+        const cur = agg.get(id) || { sum: 0, count: 0 }
+        cur.sum += v; cur.count += 1
+        agg.set(id, cur)
+      }
+      if (!agg.size) continue
+      const avgs = [...agg.entries()].map(([id, { sum, count }]) => [id, sum / count])
+      const best = Math.max(...avgs.map(([, avg]) => avg))
+      if (!(best > 0)) continue
+      for (const [id, avg] of avgs) {
+        if (avg === best) {
+          events.push({ member_id: id, event_type: item.key, points: 1, verified: true, metadata: { reason: `동료평가 1위 · ${item.label}` } })
+          winners += 1
+        }
+      }
+    }
+  }
+
+  if (events.length) {
+    const { error: insErr } = await client.from(TABLES.scoreEvents).insert(events)
+    throwIfError(insErr)
+  }
+  return { winners, teams: byTeam.size }
+}
+
 export async function createAttendanceSession(values) {
   return insertRow('activity_sessions', clean({
     title: values.title,

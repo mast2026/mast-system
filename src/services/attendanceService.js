@@ -1,4 +1,4 @@
-import { requireSupabase, throwIfError } from './baseService'
+import { requireSupabase, throwIfError, TABLES } from './baseService'
 
 const SESSION_TABLE = 'activity_sessions'
 const RECORD_TABLE = 'activity_attendance_records'
@@ -126,6 +126,19 @@ export async function submitAttendance({ currentMember, sessionId, code }) {
     .select('*')
     .single()
   throwIfError(error)
+
+  // 지각이면 활동날씨 점수에 자동 반영 (30분 이내 -1 / 초과 -3)
+  if (tier.status === 'late' && currentMember?.id != null) {
+    try {
+      await client.from(TABLES.scoreEvents).insert({
+        member_id: Number(currentMember.id),
+        event_type: tier.points <= -3 ? 'ot_late' : 'ot_late_30',
+        points: tier.points,
+        verified: true,
+        metadata: { reason: `${session.title || '모임'} 지각 · ${tier.label}` },
+      })
+    } catch { /* 점수 자동배정 실패는 출석 자체를 막지 않음 */ }
+  }
   return { ...data, lateInfo: tier }
 }
 

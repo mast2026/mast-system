@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarCheck, ChevronRight, Home, Megaphone, ShieldCheck, Trash2, Trophy } from 'lucide-react'
+import { CalendarCheck, Check, ChevronRight, Home, Megaphone, ShieldCheck, SlidersHorizontal, Trash2, Trophy } from 'lucide-react'
 import ActivityWeatherIcon from '../../components/ActivityWeatherIcon'
 import Modal from '../../components/Modal'
 import { Field, FormActions } from '../../components/FormControls'
 import { ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
-import { deleteAdminMember, getAdminMemberStatsRows, getMemberPositions, updateMemberAdminFields } from '../../services/adminService'
+import { createScoreEvent, deleteAdminMember, deleteScoreEvent, getAdminMemberStatsRows, getMemberPositions, updateMemberAdminFields, updateScoreEvent } from '../../services/adminService'
+import { SCORE_RUBRIC } from '../../utils/activityWeather'
+
+const GAINS = SCORE_RUBRIC.filter((item) => item.group === 'gain')
+const DEDUCTS = SCORE_RUBRIC.filter((item) => item.group === 'deduct')
 
 const roleLabels = {
   member: '회원',
@@ -23,15 +27,52 @@ export default function AdminMembersScreen() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [notice, setNotice] = useState('')
+  // 일괄 점수 부여
+  const [scoreMode, setScoreMode] = useState(false)
+  const [selKey, setSelKey] = useState(null)
+  const [customReason, setCustomReason] = useState('')
+  const [customPoints, setCustomPoints] = useState('')
+  const [checked, setChecked] = useState(() => new Set())
+  const [applying, setApplying] = useState(false)
 
-  if (q.loading) return <LoadingState />
-  if (q.error) return <ErrorState error={q.error} retry={q.retry} />
+  if (q.loading && !q.data) return <LoadingState />
+  if (q.error && !q.data) return <ErrorState error={q.error} retry={q.retry} />
 
   const keyword = search.trim().toLowerCase()
   const rows = (q.data ?? []).filter((row) => {
     if (!keyword) return true
     return `${row.name} ${row.school} ${row.major} ${row.generation} ${row.position_title || ''} ${roleLabels[row.role] || row.role}`.toLowerCase().includes(keyword)
   }).sort(compareMembers)
+
+  const activeItem = selKey === 'custom'
+    ? (customPoints !== '' && !Number.isNaN(Number(customPoints)) ? { key: 'manual', label: customReason.trim() || '수동 조정', points: Number(customPoints) } : null)
+    : SCORE_RUBRIC.find((r) => r.key === selKey) || null
+
+  const toggleCheck = (id) => setChecked((prev) => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+
+  const exitScoreMode = () => { setScoreMode(false); setSelKey(null); setChecked(new Set()); setCustomReason(''); setCustomPoints('') }
+
+  const applyBulk = async () => {
+    if (!activeItem || !checked.size) return
+    setApplying(true); setNotice('')
+    try {
+      const ids = [...checked]
+      for (const id of ids) {
+        await createScoreEvent({ member_id: id, event_type: activeItem.key, points: activeItem.points, reason: activeItem.label })
+      }
+      setNotice(`${ids.length}명에게 "${activeItem.label}" ${activeItem.points > 0 ? '+' : ''}${activeItem.points}점을 반영했습니다.`)
+      setChecked(new Set())
+      q.retry()
+    } catch (e) {
+      setNotice(`점수 반영 실패: ${e.message}`)
+    } finally {
+      setApplying(false)
+    }
+  }
 
   return <div className="admin-member-list-page">
     {notice && <div className="form-notice">{notice}</div>}
@@ -46,33 +87,58 @@ export default function AdminMembersScreen() {
           </div>
         </div>
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="이름, 학교, 기수 검색" />
+        <button type="button" className={`button ${scoreMode ? 'secondary' : 'primary'} bulk-score-toggle`} onClick={() => (scoreMode ? exitScoreMode() : setScoreMode(true))}>
+          <SlidersHorizontal size={15} /> {scoreMode ? '일괄 점수 닫기' : '일괄 점수 부여'}
+        </button>
       </header>
 
-      <div className="admin-member-thin-list">
-        {rows.length ? rows.map((row) => <button type="button" key={row.id} onClick={() => setSelected(row)}>
+      {scoreMode && <div className="bulk-score-panel">
+        <div className="bulk-score-step"><span className="bulk-step-num">1</span> 항목 선택</div>
+        <div className="rubric-buttons">
+          {GAINS.map((item) => <button key={item.key} type="button" className={`rubric-btn gain${selKey === item.key ? ' active' : ''}`} onClick={() => setSelKey(item.key)}>{item.label}<span>+{item.points}</span></button>)}
+          {DEDUCTS.map((item) => <button key={item.key} type="button" className={`rubric-btn deduct${selKey === item.key ? ' active' : ''}`} onClick={() => setSelKey(item.key)}>{item.label}<span>{item.points}</span></button>)}
+          <button type="button" className={`rubric-btn${selKey === 'custom' ? ' active' : ''}`} onClick={() => setSelKey('custom')}>직접 입력</button>
+        </div>
+        {selKey === 'custom' && <div className="rubric-custom">
+          <input type="text" placeholder="사유 (예: 임원진 가산)" value={customReason} onChange={(e) => setCustomReason(e.target.value)} />
+          <input type="number" placeholder="점수 (±)" value={customPoints} onChange={(e) => setCustomPoints(e.target.value)} />
+        </div>}
+        <div className="bulk-score-step"><span className="bulk-step-num">2</span> 회원 선택 후 적용 (아래 목록에서 탭하여 선택)</div>
+        <div className="bulk-score-actionbar">
+          <span>선택 <b>{checked.size}</b>명{activeItem ? ` · ${activeItem.label} ${activeItem.points > 0 ? '+' : ''}${activeItem.points}` : ''}</span>
+          <button type="button" className="button primary" disabled={applying || !activeItem || !checked.size} onClick={applyBulk}>
+            {applying ? '반영 중...' : '선택 회원에 적용'}
+          </button>
+        </div>
+      </div>}
+
+      <div className={`admin-member-thin-list${scoreMode ? ' selecting' : ''}`}>
+        {rows.length ? rows.map((row) => <button type="button" key={row.id} className={scoreMode && checked.has(row.id) ? 'is-checked' : ''} onClick={() => (scoreMode ? toggleCheck(row.id) : setSelected(row))}>
+          {scoreMode && <span className="bulk-check">{checked.has(row.id) ? <Check size={14} /> : null}</span>}
           <div className={avatarClass(row)}>{initialOf(row.name)}</div>
           <div>
             <b>{row.name || '-'}{roleTitle(row) && <span className={`exec-title-inline${memberKind(row) === 'advisor' ? ' advisor' : ''}`}>{roleTitle(row)}</span>}</b>
             <small>{row.school || '-'} · {formatGeneration(row.generation)}</small>
           </div>
-          <ChevronRight />
+          {!scoreMode && <ChevronRight />}
         </button>) : <div className="admin-empty-card">표시할 회원이 없습니다.</div>}
       </div>
     </section>
 
     {selected && <MemberDetailModal
-      member={selected}
+      member={(q.data ?? []).find((r) => r.id === selected.id) ?? selected}
       onClose={() => setSelected(null)}
       onSaved={(message) => {
         setNotice(message)
         setSelected(null)
         q.retry()
       }}
+      onScoreChanged={q.retry}
     />}
   </div>
 }
 
-function MemberDetailModal({ member, onClose, onSaved }) {
+function MemberDetailModal({ member, onClose, onSaved, onScoreChanged }) {
   const [name, setName] = useState(member.name || '')
   const [school, setSchool] = useState(member.school || '')
   const [major, setMajor] = useState(member.major || '')
@@ -151,6 +217,11 @@ function MemberDetailModal({ member, onClose, onSaved }) {
               <div><b>{member.activityWeather?.score ?? 0}점</b><small>{member.activityWeather?.grade || '-'}</small></div>
             </div>}
         </div>
+
+        {!(member.activityWeather?.exempt || memberKind(member) === 'advisor') && (
+          <MemberScorePanel member={member} onChange={onScoreChanged} />
+        )}
+
         <div className="admin-member-related">
           <RelatedSection
             title="출석 내역"
@@ -226,6 +297,61 @@ function MemberDetailModal({ member, onClose, onSaved }) {
   </Modal>
 }
 
+function MemberScorePanel({ member, onChange }) {
+  const aw = member.activityWeather || {}
+  const events = aw.events ?? []
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [customReason, setCustomReason] = useState('')
+  const [customPoints, setCustomPoints] = useState('')
+
+  const run = async (fn, msg) => {
+    setBusy(true); setNotice('')
+    try { await fn(); setNotice(msg); if (onChange) await onChange() }
+    catch (e) { setNotice(`실패: ${e.message}`) }
+    finally { setBusy(false) }
+  }
+
+  return <section className="admin-member-score-panel">
+    <div className="member-score-summary">
+      <span>시작 {aw.base ?? 70}</span>
+      <span className={(aw.totalDelta ?? 0) >= 0 ? 'up' : 'down'}>가감 {(aw.totalDelta ?? 0) >= 0 ? '+' : ''}{aw.totalDelta ?? 0}</span>
+      <b>{aw.score ?? 0}<small>/100</small> · {aw.grade || '-'}</b>
+    </div>
+    {notice && <div className="member-score-notice">{notice}</div>}
+    <div className="rubric-buttons">
+      {GAINS.map((it) => <button key={it.key} type="button" className="rubric-btn gain" disabled={busy} onClick={() => run(() => createScoreEvent({ member_id: member.id, event_type: it.key, points: it.points, reason: it.label }), `${it.label} +${it.points} 반영`)}>{it.label}<span>+{it.points}</span></button>)}
+      {DEDUCTS.map((it) => <button key={it.key} type="button" className="rubric-btn deduct" disabled={busy} onClick={() => run(() => createScoreEvent({ member_id: member.id, event_type: it.key, points: it.points, reason: it.label }), `${it.label} ${it.points} 반영`)}>{it.label}<span>{it.points}</span></button>)}
+    </div>
+    <div className="rubric-custom">
+      <input type="text" placeholder="사유 (예: 임원진 가산)" value={customReason} onChange={(e) => setCustomReason(e.target.value)} />
+      <input type="number" placeholder="±점수" value={customPoints} onChange={(e) => setCustomPoints(e.target.value)} />
+      <button type="button" className="button primary" disabled={busy || customPoints === '' || Number.isNaN(Number(customPoints))} onClick={() => { run(() => createScoreEvent({ member_id: member.id, event_type: 'manual', points: Number(customPoints), reason: customReason.trim() || '수동 조정' }), '수동 점수를 추가했습니다.'); setCustomReason(''); setCustomPoints('') }}>추가</button>
+    </div>
+    <div className="score-event-list">
+      {!events.length && <p className="score-empty">아직 반영된 점수가 없습니다.</p>}
+      {events.map((ev) => <MemberScoreRow key={ev.id} ev={ev} busy={busy} onEdit={(id, p) => run(() => updateScoreEvent(id, { points: p }), '점수를 수정했습니다.')} onDelete={(id) => run(() => deleteScoreEvent(id), '항목을 삭제했습니다.')} />)}
+    </div>
+  </section>
+}
+
+function MemberScoreRow({ ev, busy, onEdit, onDelete }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(String(ev.points))
+  return <div className="score-event-row">
+    <b>{ev.label}</b>
+    {editing ? <span className="score-event-edit">
+      <input type="number" value={value} onChange={(e) => setValue(e.target.value)} />
+      <button type="button" className="table-button" disabled={busy} onClick={() => { onEdit(ev.id, Number(value)); setEditing(false) }}>저장</button>
+      <button type="button" className="table-button" onClick={() => { setValue(String(ev.points)); setEditing(false) }}>취소</button>
+    </span> : <>
+      <em className={ev.points >= 0 ? 'up' : 'down'}>{ev.points >= 0 ? '+' : ''}{ev.points}</em>
+      <button type="button" className="table-button" disabled={busy} onClick={() => setEditing(true)}>수정</button>
+      <button type="button" className="table-button danger" disabled={busy} onClick={() => onDelete(ev.id)}><Trash2 size={13} /></button>
+    </>}
+  </div>
+}
+
 function InfoCard({ icon: Icon, label, value, note }) {
   return <article className="admin-member-info-card"><Icon /><div><span>{label}</span><b>{value}</b><small>{note}</small></div></article>
 }
@@ -247,8 +373,14 @@ function avatarClass(member, large = false) {
   return `member-mini-avatar${large ? ' large' : ''}${ring}`
 }
 
-// 기본 정렬: 지도교수·고문 먼저 → 임원진 → 기수순 → 이름 가나다순 → 학교 가나다순
+function isTestMember(m) {
+  return String(m?.name || '').includes('[테스트]')
+}
+
+// 기본 정렬: [테스트] 회원은 항상 맨 아래 → 지도교수·고문 먼저 → 임원진 → 기수순 → 이름 → 학교
 function compareMembers(a, b) {
+  const at = isTestMember(a), bt = isTestMember(b)
+  if (at !== bt) return at ? 1 : -1
   const rank = (m) => { const k = memberKind(m); return k === 'advisor' ? 0 : k === 'exec' ? 1 : 2 }
   const aRank = rank(a)
   const bRank = rank(b)
