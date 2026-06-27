@@ -1,132 +1,115 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
 import ActivityWeatherIcon from '../../components/ActivityWeatherIcon'
 import Modal from '../../components/Modal'
 import AdminTable from '../../components/AdminTable'
-import { Field, FormActions } from '../../components/FormControls'
 import { ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
-import { createScoreEvent, getAdminActivityWeatherRows } from '../../services/adminService'
+import { createScoreEvent, deleteScoreEvent, getAdminActivityWeatherRows, updateScoreEvent } from '../../services/adminService'
+import { SCORE_RUBRIC, WEATHER_BASE_SCORE } from '../../utils/activityWeather'
+
+const GAINS = SCORE_RUBRIC.filter((item) => item.group === 'gain')
+const DEDUCTS = SCORE_RUBRIC.filter((item) => item.group === 'deduct')
 
 export default function AdminActivityWeatherScreen() {
   const q = useQuery(getAdminActivityWeatherRows, [])
-  const [creating, setCreating] = useState(false)
-  const [detail, setDetail] = useState(null)
+  const [detailId, setDetailId] = useState(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
-  const save = async (values) => {
+
+  const run = async (fn, successMsg) => {
     setBusy(true); setNotice('')
-    try { await createScoreEvent(values); setCreating(false); setNotice('점수 이벤트를 추가했습니다. verified=true인 이벤트만 계산에 반영됩니다.'); q.retry() }
-    catch (error) { setNotice(`${error.message} · DB 컬럼 확인 필요`) }
+    try { await fn(); if (successMsg) setNotice(successMsg); await q.retry() }
+    catch (error) { setNotice(error.message) }
     finally { setBusy(false) }
   }
-  if (q.loading) return <LoadingState label="전체 활동날씨를 불러오는 중" />
-  if (q.error) return <ErrorState error={q.error} retry={q.retry} />
+
+  if (q.loading && !q.data) return <LoadingState label="전체 활동날씨를 불러오는 중" />
+  if (q.error && !q.data) return <ErrorState error={q.error} retry={q.retry} />
+
+  const rows = (q.data ?? []).filter((row) => !row.activityWeather?.exempt)
+  const detailRow = detailId != null ? (q.data ?? []).find((row) => row.id === detailId) : null
+
   return <>
-    <PageHeader title="활동날씨 관리" description="에타 홍보 40점, 오프라인 출석 30점, 공모전 동료평가 30점 기준으로 확인합니다." action={<button className="button primary" onClick={() => setCreating(true)}><Plus/>오프라인 점수 추가</button>} />
+    <PageHeader title="활동날씨 관리" description={`모든 회원은 ${WEATHER_BASE_SCORE}점에서 시작하고, 항목별 가감점을 더해 0~100점으로 계산합니다.`} />
     {notice && <div className="form-notice">{notice}</div>}
-    <AdminTable rows={(q.data ?? []).filter((row) => !row.activityWeather?.exempt)} searchPlaceholder="회원, 학교, 기수 검색" getSearchText={(row) => `${row.name} ${row.school} ${row.generation}`}
+    <AdminTable rows={rows} searchPlaceholder="회원, 학교, 기수 검색" getSearchText={(row) => `${row.name} ${row.school} ${row.generation}`}
       columns={[
         { key: 'name', label: '회원', render: (row) => <><b>{row.name}</b><small className="cell-sub">{[row.school, row.generation ? `${row.generation}기` : ''].filter(Boolean).join(' · ') || '-'}</small></> },
-        { key: 'weather', label: '활동날씨', render: (row) => {
-          const aw = row.activityWeather
-          return <div className="weather-cell"><ActivityWeatherIcon weather={aw} size="tiny"/><span>{aw.grade}</span></div>
-        }},
-        { key: 'score', label: '점수', render: (row) => {
-          const aw = row.activityWeather
-          return aw.isCollectingData ? <span style={{fontSize:'11px',color:'#9aa7ad'}}>수집 중</span> : <strong>{aw.score}</strong>
-        }, sortValue: (row) => row.activityWeather.score ?? -1 },
-        { key: 'promotion', label: '홍보', render: (row) => {
-          const b = row.activityWeather.breakdown.promotion
-          return <ScoreDetailButton row={row} type="promotion" label={`${Math.round(b.points ?? 0)}/${b.maxPoints}`} onClick={setDetail} />
-        }, sortValue: (row) => row.activityWeather.breakdown.promotion.points ?? -1 },
-        { key: 'offline', label: '출석', render: (row) => {
-          const b = row.activityWeather.breakdown.offline
-          return <ScoreDetailButton row={row} type="offline" label={`${Math.round(b.points ?? 0)}/${b.maxPoints}`} onClick={setDetail} />
-        }, sortValue: (row) => row.activityWeather.breakdown.offline.points ?? -1 },
-        { key: 'peer', label: '동료평가', render: (row) => {
-          const b = row.activityWeather.breakdown.peerReview
-          return <ScoreDetailButton row={row} type="peer" label={`${Math.round(b.points ?? 0)}/${b.maxPoints}`} onClick={setDetail} />
-        }, sortValue: (row) => row.activityWeather.breakdown.peerReview.points ?? -1 },
+        { key: 'weather', label: '활동날씨', render: (row) => <div className="weather-cell"><ActivityWeatherIcon weather={row.activityWeather} size="tiny"/><span>{row.activityWeather.grade}</span></div> },
+        { key: 'score', label: '점수', render: (row) => <strong>{row.activityWeather.score}<small style={{color:'#9aa7ad'}}>/100</small></strong>, sortValue: (row) => row.activityWeather.score ?? -1 },
+        { key: 'delta', label: '가감점', render: (row) => {
+          const total = row.activityWeather.totalDelta ?? 0
+          const count = row.activityWeather.events?.length ?? 0
+          return <span className={`delta-pill ${total >= 0 ? 'up' : 'down'}`}>{total >= 0 ? '+' : ''}{total} · {count}건</span>
+        }, sortValue: (row) => row.activityWeather.totalDelta ?? 0 },
+        { key: 'manage', label: '관리', render: (row) => <button className="table-button" onClick={() => { setDetailId(row.id); setNotice('') }}>점수 편집</button> },
       ]} />
-    {creating && <Modal title="오프라인 점수 이벤트 추가" onClose={() => setCreating(false)} wide><ScoreEventForm members={q.data} onSubmit={save} onCancel={() => setCreating(false)} busy={busy}/></Modal>}
-    {detail && <Modal title={`${detail.row.name} · ${detailTitle(detail.type)}`} onClose={() => setDetail(null)} wide><WeatherScoreDetail detail={detail}/></Modal>}
+
+    {detailRow && <Modal title={`${detailRow.name} · 점수 편집`} onClose={() => setDetailId(null)} wide>
+      <ScoreEditor
+        row={detailRow}
+        busy={busy}
+        onAddPreset={(item) => run(() => createScoreEvent({ member_id: detailRow.id, event_type: item.key, points: item.points, reason: item.label }), `${item.label} ${item.points > 0 ? '+' : ''}${item.points}점 반영`)}
+        onAddCustom={(reason, points) => run(() => createScoreEvent({ member_id: detailRow.id, event_type: 'manual', points, reason }), '수동 점수를 추가했습니다.')}
+        onEdit={(id, points) => run(() => updateScoreEvent(id, { points }), '점수를 수정했습니다.')}
+        onDelete={(id) => run(() => deleteScoreEvent(id), '항목을 삭제했습니다.')}
+      />
+    </Modal>}
   </>
 }
 
-function ScoreDetailButton({ row, type, label, onClick }) {
-  return <button className="score-detail-button" type="button" onClick={() => onClick({ row, type })}>{label}<span>상세</span></button>
-}
+function ScoreEditor({ row, busy, onAddPreset, onAddCustom, onEdit, onDelete }) {
+  const aw = row.activityWeather
+  const events = aw.events ?? []
+  const [customReason, setCustomReason] = useState('')
+  const [customPoints, setCustomPoints] = useState('')
 
-function detailTitle(type) {
-  return type === 'promotion' ? '에타 홍보 점수' : type === 'offline' ? '오프라인 점수' : '동료평가 점수'
-}
+  return <div className="score-editor">
+    <div className="score-editor-summary">
+      <div><span>시작 점수</span><b>{aw.base ?? WEATHER_BASE_SCORE}</b></div>
+      <div><span>가감점 합계</span><b className={(aw.totalDelta ?? 0) >= 0 ? 'up' : 'down'}>{(aw.totalDelta ?? 0) >= 0 ? '+' : ''}{aw.totalDelta ?? 0}</b></div>
+      <div className="score-editor-total"><span>현재 점수</span><b>{aw.score}<small>/100</small></b><em>{aw.grade}</em></div>
+    </div>
 
-function WeatherScoreDetail({ detail }) {
-  const { row, type } = detail
-  if (type === 'promotion') {
-    const data = row.raw?.promotionData
-    return <div className="score-detail-panel">
-      <Info label="반영 기준" value="에타 홍보 미션 완료율 · 최대 40점" />
-      <Info label="완료율" value={formatPercent(data?.completion_rate)} />
-      <Info label="승인/목표" value={data?.target_count ? `${data?.approved_count ?? 0}/${data.target_count}` : '데이터 없음'} />
-      <RawBox data={data} />
+    <h3>가산 항목</h3>
+    <div className="rubric-buttons">
+      {GAINS.map((item) => <button key={item.key} type="button" className="rubric-btn gain" disabled={busy} onClick={() => onAddPreset(item)}>{item.label}<span>+{item.points}</span></button>)}
     </div>
-  }
-  if (type === 'offline') {
-    const summary = row.raw?.attendanceSummary
-    const events = row.raw?.scoreEvents ?? []
-    const breakdown = row.activityWeather.breakdown.offline
-    return <div className="score-detail-panel">
-      <Info label="반영 기준" value="OT·오프라인 출석/운영진 인증 이벤트 · 최대 30점" />
-      <Info label="현재 반영" value={breakdown?.assumedDefault ? 'OT 전 기본 점수 반영' : `${Math.round(breakdown?.points ?? 0)}/${breakdown?.maxPoints ?? 30}점`} />
-      <Info label="출석률" value={summary ? formatPercent(summary?.attendance_rate) : 'OT 전 기본 점수 반영'} />
-      <h3>인증 이벤트</h3>
-      <div className="mini-list">{events.length ? events.map((event) => <span key={event.id}>{event.metadata?.reason || event.reason || event.memo || event.event_type || '오프라인'} · {event.score_delta ?? event.points ?? 0}점</span>) : <span>OT 전이라 기본 출석 점수를 반영 중입니다.</span>}</div>
-      <RawBox data={summary} />
+    <h3>감점 항목</h3>
+    <div className="rubric-buttons">
+      {DEDUCTS.map((item) => <button key={item.key} type="button" className="rubric-btn deduct" disabled={busy} onClick={() => onAddPreset(item)}>{item.label}<span>{item.points}</span></button>)}
     </div>
-  }
-  const reviews = row.raw?.peerReviews ?? []
-  return <div className="score-detail-panel">
-    <Info label="반영 기준" value="공모전 협업 평가 평균 · 최대 30점" />
-    <Info label="평가 수" value={`${reviews.length}건`} />
-    <div className="peer-review-detail-list">
-      {reviews.length ? reviews.map((review) => <article key={review.id}>
-        <b>{review.comment || review.comments || '코멘트 없음'}</b>
-        <span>참여 {scoreOf(review, 'participation')} · 성실 {scoreOf(review, 'sincerity')} · 협업 {scoreOf(review, 'collaboration')} · 소통 {scoreOf(review, 'communication')}</span>
-      </article>) : <p>공모전 종료 후 동료평가가 반영됩니다.</p>}
+
+    <h3>직접 입력</h3>
+    <div className="rubric-custom">
+      <input type="text" placeholder="사유 (예: 임원진 가산)" value={customReason} onChange={(e) => setCustomReason(e.target.value)} />
+      <input type="number" placeholder="점수 (±)" value={customPoints} onChange={(e) => setCustomPoints(e.target.value)} />
+      <button type="button" className="button primary" disabled={busy || !customPoints || Number.isNaN(Number(customPoints))} onClick={() => { onAddCustom(customReason || '수동 조정', Number(customPoints)); setCustomReason(''); setCustomPoints('') }}><Plus size={15}/>추가</button>
+    </div>
+
+    <h3>반영된 내역 <small>{events.length}건</small></h3>
+    <div className="score-event-list">
+      {!events.length && <p className="score-empty">아직 반영된 점수가 없습니다. 위 버튼으로 추가하세요.</p>}
+      {events.map((ev) => <EventRow key={ev.id} ev={ev} busy={busy} onEdit={onEdit} onDelete={onDelete} />)}
     </div>
   </div>
 }
 
-function Info({ label, value }) {
-  return <div className="score-detail-info"><b>{label}</b><span>{value || '-'}</span></div>
-}
-
-function RawBox({ data }) {
-  if (!data) return null
-  return <details className="raw-detail"><summary>원본 데이터 보기</summary><pre>{JSON.stringify(data, null, 2)}</pre></details>
-}
-
-function formatPercent(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '데이터 없음'
-  const number = Number(value)
-  return `${Math.round(number <= 1 ? number * 100 : number)}%`
-}
-
-function scoreOf(row, key) {
-  return row[key] ?? row[`${key}_score`] ?? '-'
-}
-
-function ScoreEventForm({ members, onSubmit, onCancel, busy }) {
-  const [form, setForm] = useState({ member_id: '', event_type: 'offline', score_delta: 0, reason: '', verified: true })
-  const set = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
-  return <form className="data-form" onSubmit={(event) => { event.preventDefault(); onSubmit(form) }}>
-    <Field label="회원" required><select value={form.member_id} onChange={(event) => set('member_id', event.target.value)} required><option value="">선택하세요</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></Field>
-    <Field label="점수" required><input type="number" value={form.score_delta} onChange={(event) => set('score_delta', event.target.value)} required /></Field>
-    <Field label="사유"><textarea value={form.reason} onChange={(event) => set('reason', event.target.value)} /></Field>
-    <label className="check-field"><input type="checkbox" checked={Boolean(form.verified)} onChange={(event) => set('verified', event.target.checked)} /><span>verified = true</span></label>
-    <FormActions submitting={busy} submitLabel="점수 추가" onCancel={onCancel}/>
-  </form>
+function EventRow({ ev, busy, onEdit, onDelete }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(String(ev.points))
+  return <div className="score-event-row">
+    <b>{ev.label}</b>
+    {editing ? <span className="score-event-edit">
+      <input type="number" value={value} onChange={(e) => setValue(e.target.value)} />
+      <button type="button" className="table-button" disabled={busy} onClick={() => { onEdit(ev.id, Number(value)); setEditing(false) }}>저장</button>
+      <button type="button" className="table-button" onClick={() => { setValue(String(ev.points)); setEditing(false) }}>취소</button>
+    </span> : <>
+      <em className={ev.points >= 0 ? 'up' : 'down'}>{ev.points >= 0 ? '+' : ''}{ev.points}</em>
+      <button type="button" className="table-button" disabled={busy} onClick={() => setEditing(true)}>수정</button>
+      <button type="button" className="table-button danger" disabled={busy} onClick={() => onDelete(ev.id)} aria-label="삭제"><Trash2 size={14}/></button>
+    </>}
+  </div>
 }

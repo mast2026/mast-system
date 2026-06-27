@@ -4790,3 +4790,102 @@ svg.login-v2-wave{bottom:-17px!important}
 
 /* 회원 메인 히어로: 날씨 아이콘 주위로 퍼지는 배경 그라데이션 */
 .mast-main-home-hero{background:radial-gradient(circle at 80% 52%, rgba(168,211,255,.62), rgba(220,238,255,.34) 40%, rgba(244,249,255,0) 72%)!important}
+
+/* ===== 2026-06-26 로그인/홈 히어로 보정 ===== */
+/* 로그인 글씨가 물결에 가리지 않게: 물결 곡선은 유지, 폼 텍스트를 물결 아래로 내림 */
+.login-v2-form{margin-top:-48px!important;padding-top:84px!important}
+@media(max-width:420px){.login-v2-form{margin-top:-42px!important;padding-top:78px!important}}
+
+/* 회원 메인 히어로 배경 그라데이션 더 진하게(아이콘 우하단 중심) */
+.mast-main-home-hero{background:radial-gradient(circle at 82% 60%, rgba(126,186,255,.88), rgba(180,217,255,.52) 42%, rgba(232,243,255,0) 74%)!important}
+
+/* 날씨 아이콘: 무지개 제외, 우측 하단 모서리 고정 후 20% 확대 */
+.mast-home-hero-weather .weather-size-hero:not(.weather-rainbow){transform:scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* ===== 활동날씨 점수 내역(회원) ===== */
+.score-ledger{display:flex;flex-direction:column;gap:0;background:#fff;border:1px solid #eef2f8;border-radius:18px;overflow:hidden}
+.score-ledger-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;border-bottom:1px solid #f1f4fa}
+.score-ledger-row:last-child{border-bottom:0}
+.score-ledger-row b{font-weight:600;color:#27324a;font-size:14px}
+.score-ledger-row em{font-style:normal;font-weight:700;color:#46506a}
+.score-ledger-row em.up{color:#1f9d57}
+.score-ledger-row em.down{color:#e0564f}
+.score-ledger-row.base{background:#f7faff}
+.score-ledger-row.base em{color:#3977ff}
+.score-ledger-row.total{background:#eef5ff}
+.score-ledger-row.total b{font-size:15px}
+.score-ledger-row.total em{font-size:20px;color:#1b2a4a}
+.score-ledger-row.total em small{font-size:12px;color:#9aa7ad;font-weight:600}
+.score-ledger-empty{padding:18px 16px;color:#8a97a6;font-size:13px;text-align:center}
+
+/* ===== 관리자 점수 편집 ===== */
+.delta-pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700}
+.delta-pill.up{background:#e7f7ee;color:#1f9d57}
+.delta-pill.down{background:#fdeceb;color:#e0564f}
+.score-editor{display:flex;flex-direction:column;gap:14px}
+.score-editor h3{margin:6px 0 0;font-size:14px;color:#2a3550}
+.score-editor h3 small{color:#9aa7ad;font-weight:600;margin-left:4px}
+.score-editor-summary{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:10px;background:#f7faff;border:1px solid #e8eef9;border-radius:16px;padding:14px 16px}
+.score-editor-summary>div{display:flex;flex-direction:column;gap:3px}
+.score-editor-summary span{font-size:12px;color:#8a97a6}
+.score-editor-summary b{font-size:20px;color:#1b2a4a}
+.score-editor-summary b.up{color:#1f9d57}
+.score-editor-summary b.down{color:#e0564f}
+.score-editor-total{border-left:1px solid #e2e9f5;padding-left:14px;position:relative}
+.score-editor-total b small{font-size:12px;color:#9aa7ad;font-weight:600}
+.score-editor-total em{position:absolute;top:14px;right:0;font-style:normal;font-size:12px;font-weight:700;color:#3977ff;background:#eaf2ff;padding:2px 8px;border-radius:999px}
+.rubric-buttons{display:flex;flex-wrap:wrap;gap:8px}
+.rubric-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #e3e9f3;background:#fff;border-radius:12px;padding:8px 12px;font-size:13px;color:#2a3550;cursor:pointer}
+.rubric-btn span{font-weight:800;font-size:12px}
+.rubric-btn.gain{border-color:#bfe6cd}
+.rubric-btn.gain span{color:#1f9d57}
+.rubric-btn.deduct{border-color:#f3cdc9}
+.rubric-btn.deduct span{color:#e0564f}
+.rubric-btn:hover{background:#f6f9ff}
+.rubric-btn:disabled{opacity:.5;cursor:default}
+.rubric-custom{display:flex;gap:8px;align-items:center}
+.rubric-custom input[type=text]{flex:1}
+.rubric-custom input[type=number]{width:96px}
+.rubric-custom input{border:1px solid #dde5f0;border-radius:10px;padding:9px 11px;font-size:13px}
+.score-event-list{display:flex;flex-direction:column;border:1px solid #eef2f8;border-radius:14px;overflow:hidden}
+.score-event-row{display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid #f1f4fa}
+.score-event-row:last-child{border-bottom:0}
+.score-event-row b{flex:1;font-weight:600;font-size:13px;color:#27324a}
+.score-event-row em{font-style:normal;font-weight:700;font-size:14px}
+.score-event-row em.up{color:#1f9d57}
+.score-event-row em.down{color:#e0564f}
+.score-event-edit{display:flex;align-items:center;gap:6px}
+.score-event-edit input{width:72px;border:1px solid #dde5f0;border-radius:8px;padding:6px 8px;font-size:13px}
+.score-empty{padding:16px;color:#8a97a6;font-size:13px;text-align:center}
+
+/* 홈 날씨 아이콘: 화창/구름낀해/먹구름 오른쪽 16, 아래 15 이동 */
+.mast-home-hero-weather .weather-sunny.weather-size-hero,
+.mast-home-hero-weather .weather-partly_sunny.weather-size-hero,
+.mast-home-hero-weather .weather-cloudy.weather-size-hero{transform:translate(16px,15px) scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* 홈 구름(구름낀해) 아이콘 추가 이동: 오른쪽 15, 아래 10 (기존 16/15 + 15/10) */
+.mast-home-hero-weather .weather-partly_sunny.weather-size-hero{transform:translate(31px,25px) scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* 홈 구름(구름낀해) 추가 이동 +15/+10 (누적 총 46/35) */
+.mast-home-hero-weather .weather-partly_sunny.weather-size-hero{transform:translate(46px,35px) scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* 홈 구름(구름낀해) 추가 이동 (누적 총 61/45) */
+.mast-home-hero-weather .weather-partly_sunny.weather-size-hero{transform:translate(61px,45px) scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* 홈 구름(구름낀해) 추가 이동 +20/+20 (누적 총 81/65) */
+.mast-home-hero-weather .weather-partly_sunny.weather-size-hero{transform:translate(81px,65px) scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* 홈에 실제 표시되는 '흐림(구름)' 아이콘 이동 — 70점 기본 등급이 cloudy_bright 라서 이걸 잡아야 함 (오른쪽 81, 아래 65) */
+.mast-home-hero-weather .weather-cloudy_bright.weather-size-hero{transform:translate(81px,65px) scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* 홈 흐림(구름) 아이콘 왼쪽 20·위 20 (누적 61/45) */
+.mast-home-hero-weather .weather-cloudy_bright.weather-size-hero{transform:translate(61px,45px) scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* 홈 흐림(구름) 아이콘 왼쪽 20 더 (누적 41/45) */
+.mast-home-hero-weather .weather-cloudy_bright.weather-size-hero{transform:translate(41px,45px) scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* 홈 흐림(구름) 아이콘 왼쪽 5·위 10 (누적 36/35) */
+.mast-home-hero-weather .weather-cloudy_bright.weather-size-hero{transform:translate(36px,35px) scale(1.2)!important;transform-origin:100% 100%!important}
+
+/* 운영진 출석 현황: 체크 시각 표시 */
+.attendance-roster-row .attendance-check-time{display:block;margin-top:2px;font-size:11px;color:#3977ff;font-weight:700}

@@ -65,13 +65,19 @@ function AdminLoginEntry() {
   return <Navigate to={canAccessAdmin ? '/admin' : '/'} replace />
 }
 
+// 루트("/") 진입 시 관리자(운영진/지도교수)는 관리자 콘솔로 보냅니다.
+function HomeEntry() {
+  const { canAccessAdmin } = useAuth() || {}
+  return canAccessAdmin ? <Navigate to="/admin" replace /> : <HomeScreen />
+}
+
 function AppRoutes() {
   return <Routes>
     <Route path="/login" element={<LoginEntry />} />
     <Route path="/admin-login" element={<AdminLoginEntry />} />
 
     <Route element={<MemberRoute />}>
-      <Route index element={<HomeScreen />} />
+      <Route index element={<HomeEntry />} />
       <Route path="promotion" element={<PromotionLegacyScreen />} />
       <Route path="attendance" element={<AttendanceScreen />} />
       <Route path="activity-weather" element={<ActivityWeatherScreen />} />

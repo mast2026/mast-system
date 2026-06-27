@@ -279,11 +279,14 @@ function RosterColumn({ title, members, recordMap, onMark, busy }) {
   return <article className="attendance-roster-column">
     <h3>{title}</h3>
     {!members.length ? <div className="admin-empty-card">해당 회원이 없습니다.</div> : members.map((member) => {
-      const status = recordMap.get(String(member.id))?.status || 'absent'
+      const record = recordMap.get(String(member.id))
+      const status = record?.status || 'absent'
+      const lateNote = status === 'late' ? (Number(record?.points) <= -3 ? ' · 30분 초과(-3)' : ' · 30분 이내(-1)') : ''
       return <div className="attendance-roster-row" key={member.id}>
         <div>
           <b>{member.name}</b>
           <span>{member.gi || member.generation || '-'} · {member.school || '-'}</span>
+          {record?.checked_at && <small className="attendance-check-time">체크 {fmtCheckTime(record.checked_at)}{lateNote}</small>}
         </div>
         <Badge value={attendanceStatusLabel(status)} />
         <div>
@@ -337,6 +340,7 @@ function AttendanceSessionForm({ initial, onSubmit, onCancel, busy }) {
     location: initial?.location || '',
     starts_at: toLocalInput(initial?.starts_at),
     ends_at: toLocalInput(initial?.ends_at),
+    ontime_at: toLocalInput(initial?.ontime_at),
     status: initial?.status || 'scheduled',
     attendance_code_enabled: initial?.attendance_code_enabled !== false,
     attendance_code: initial?.attendance_code || '',
@@ -354,6 +358,7 @@ function AttendanceSessionForm({ initial, onSubmit, onCancel, busy }) {
       <Field label="장소"><input value={form.location} onChange={(event) => set('location', event.target.value)} placeholder="예: 중앙대학교 310관" /></Field>
       <Field label="시작 일시" required><input type="datetime-local" value={form.starts_at} onChange={(event) => set('starts_at', event.target.value)} required /></Field>
       <Field label="종료 일시"><input type="datetime-local" value={form.ends_at} onChange={(event) => set('ends_at', event.target.value)} /></Field>
+      <Field label="출석 정시 마감 (이후 지각·비우면 시작 일시 기준)"><input type="datetime-local" value={form.ontime_at} onChange={(event) => set('ontime_at', event.target.value)} /></Field>
       <Field label="상태"><select value={form.status} onChange={(event) => set('status', event.target.value)}><option value="scheduled">예정</option><option value="open">출석 가능</option><option value="closed">마감</option></select></Field>
       <Field label="모임 유형"><select value={form.session_mode} onChange={(event) => set('session_mode', event.target.value)}><option value="offline">오프라인</option><option value="online">온라인</option></select></Field>
       <Field label="출석코드"><input value={form.attendance_code} onChange={(event) => set('attendance_code', event.target.value)} placeholder="비워두면 나중에 입력" /></Field>
@@ -389,6 +394,12 @@ function shortDate(date) {
 function timeOnly(date) {
   if (!date || Number.isNaN(date.getTime())) return ''
   return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+function fmtCheckTime(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${isToday(d) ? '오늘' : shortDate(d)} ${timeOnly(d)}`
 }
 function formatSessionDate(session) {
   if (!session?.starts_at) return '일정 미정'

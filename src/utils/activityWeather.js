@@ -71,3 +71,60 @@ export function weatherFor(score) {
   const { grade, weatherType, message } = gradeFor(score)
   return { key: weatherType, label: grade, message }
 }
+
+/* ===========================================================================
+ * 루브릭 기반 점수 모델 (2026-06-26 개편)
+ * 모든 회원은 70점에서 시작하고, 관리자가 입력한 가감점 이벤트를 합산합니다.
+ * 최종 점수는 0~100으로 제한합니다.
+ * ========================================================================= */
+export const WEATHER_BASE_SCORE = 70
+
+// 관리자 화면에서 버튼으로 노출되는 가감점 프리셋.
+// key는 score_events.event_type 로 저장되고, points 는 부호 포함 점수입니다.
+export const SCORE_RUBRIC = [
+  // 가산
+  { key: 'ot_present',         label: '오티 정참',                 points: 5,   group: 'gain' },
+  { key: 'ot_jacket',          label: '오티 과잠바 착용',           points: 2,   group: 'gain' },
+  { key: 'contest_join',       label: '공모전 참여',               points: 1,   group: 'gain' },
+  { key: 'contest_peer',       label: '공모전 동료 평가',           points: 1,   group: 'gain' },
+  { key: 'contest_submit',     label: '공모전 제출/미팅/피드백 참여', points: 5,   group: 'gain' },
+  { key: 'contest_award',      label: '공모전 수상',               points: 20,  group: 'gain' },
+  // 감점
+  { key: 'ot_late',            label: '오티 지각',                 points: -3,  group: 'deduct' },
+  { key: 'ot_late_30',         label: '오티 지각(30분 이내)',       points: -1,  group: 'deduct' },
+  { key: 'ot_absent',          label: '오티 결석',                 points: -10, group: 'deduct' },
+  { key: 'ot_no_jacket',       label: '오티 과잠바 미착용',         points: -2,  group: 'deduct' },
+  { key: 'eta_miss',           label: '에타 1회 미참여',            points: -2,  group: 'deduct' },
+  { key: 'contest_out',        label: '공모전 정정기간 외 아웃',     points: -10, group: 'deduct' },
+  { key: 'contest_no_submit',  label: '공모전 제출/미팅/피드백 미참여', points: -5, group: 'deduct' },
+]
+
+const RUBRIC_BY_KEY = Object.fromEntries(SCORE_RUBRIC.map((item) => [item.key, item]))
+
+// score_events 한 건의 라벨/점수를 정규화합니다.
+export function normalizeScoreEvent(event) {
+  const points = Number(event?.points ?? event?.score_delta ?? 0) || 0
+  const key = event?.event_type ?? ''
+  const reason = event?.metadata?.reason ?? event?.reason ?? ''
+  const label = reason || RUBRIC_BY_KEY[key]?.label || key || '점수 조정'
+  return { id: event?.id, key, points, label, createdAt: event?.created_at ?? null }
+}
+
+/**
+ * 이벤트 합산으로 활동날씨를 계산합니다. (70점 시작, 0~100 제한)
+ * @param {Array} events - team_matching_member_score_events 행 배열
+ */
+export function calculateWeatherFromEvents(events = [], { base = WEATHER_BASE_SCORE } = {}) {
+  const items = (events ?? []).map(normalizeScoreEvent)
+  const totalDelta = items.reduce((sum, item) => sum + item.points, 0)
+  const score = clampPercent(Math.round(base + totalDelta))
+  const gradeInfo = gradeFor(score)
+  return {
+    score,
+    ...gradeInfo,
+    isCollectingData: false,
+    base,
+    totalDelta,
+    events: items,
+  }
+}

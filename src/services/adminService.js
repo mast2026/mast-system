@@ -507,11 +507,30 @@ export async function getAdminActivityWeatherRows() {
 export async function createScoreEvent(values) {
   return insertRow(TABLES.scoreEvents, clean({
     member_id: Number(values.member_id),
-    event_type: values.event_type || 'offline',
+    event_type: values.event_type || 'manual',
     points: Number(values.score_delta ?? values.points ?? 0),
-    verified: Boolean(values.verified),
+    verified: values.verified === undefined ? true : Boolean(values.verified),
     metadata: clean({ reason: values.reason }),
   }))
+}
+
+export async function updateScoreEvent(id, values) {
+  const payload = clean({
+    points: values.points === undefined && values.score_delta === undefined
+      ? undefined
+      : Number(values.score_delta ?? values.points),
+    event_type: values.event_type,
+    metadata: values.reason === undefined ? undefined : clean({ reason: values.reason }),
+  })
+  return updateRow(TABLES.scoreEvents, id, payload)
+}
+
+export async function deleteScoreEvent(id) {
+  const client = requireSupabase()
+  const { data, error } = await client.from(TABLES.scoreEvents).delete().eq('id', id).select('id')
+  throwIfError(error)
+  assertDeleted(data)
+  return true
 }
 
 export async function createAttendanceSession(values) {
@@ -520,6 +539,7 @@ export async function createAttendanceSession(values) {
     location: values.location,
     starts_at: toIso(values.starts_at),
     ends_at: toIso(values.ends_at),
+    ontime_at: toIso(values.ontime_at),
     status: values.status || 'scheduled',
     attendance_code_enabled: values.attendance_code_enabled !== false,
     attendance_code: values.attendance_code,
@@ -537,6 +557,7 @@ export async function updateAttendanceSession(id, values) {
     location: values.location,
     starts_at: toIso(values.starts_at),
     ends_at: toIso(values.ends_at),
+    ontime_at: toIso(values.ontime_at),
     status: values.status || 'scheduled',
     attendance_code_enabled: values.attendance_code_enabled !== false,
     attendance_code: values.attendance_code,

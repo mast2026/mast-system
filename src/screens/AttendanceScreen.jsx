@@ -4,7 +4,7 @@ import { CalendarDays, CheckCircle2, ChevronRight, ClipboardCheck, LockKeyhole, 
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import { useAuth } from '../context/AuthContext'
 import useQuery from '../hooks/useQuery'
-import { attendanceStatusLabel, getAttendanceDashboard, submitAttendance } from '../services/attendanceService'
+import { attendanceStatusLabel, effectiveSessionStatus, getAttendanceDashboard, isAttendableNow, submitAttendance } from '../services/attendanceService'
 
 const memberTabs = [
   ['home', '홈'],
@@ -30,7 +30,7 @@ export default function AttendanceScreen() {
   const sortedSessions = [...data.sessions].sort(byStartsAtDesc)
   const upcomingSessions = sortedSessions.filter((session) => !isPastSession(session)).slice(0, 3)
   const recentSessions = sortedSessions.filter((session) => isPastSession(session)).slice(0, 3)
-  const openSessions = data.sessions.filter((session) => ['open', 'scheduled'].includes(String(session.status ?? 'scheduled')))
+  const openSessions = data.sessions.filter((session) => isAttendableNow(session))
   const attendanceRate = data.summary?.attendance_rate ?? null
   const visibleTabs = isAdmin ? [...memberTabs, adminTab] : memberTabs
   const connectionNotice = formatAttendanceNotice(data.memberWarning)
@@ -206,7 +206,7 @@ function SessionList({ sessions, records = [], emptyTitle }) {
             <p>{session.description || session.location || '모임 설명이 없습니다.'}</p>
             <small>{formatSessionDate(session)}</small>
           </div>
-          <span className={`badge badge-${myRecord?.status || session.status || 'scheduled'}`}>{attendanceStatusLabel(myRecord?.status || session.status || 'scheduled')}</span>
+          <span className={`badge badge-${myRecord?.status || effectiveSessionStatus(session)}`}>{attendanceStatusLabel(myRecord?.status || effectiveSessionStatus(session))}</span>
         </article>
         )
       })}

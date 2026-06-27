@@ -908,6 +908,7 @@ function UploadForm(props) {
   var _preview = useState(null), preview = _preview[0], setPreview = _preview[1];
   var _busy = useState(false), busy = _busy[0], setBusy = _busy[1];
   var _err = useState(""), err = _err[0], setErr = _err[1];
+  var _skip = useState(false), skipped = _skip[0], setSkipped = _skip[1];
   var fileRef = useRef(null);
 
   function pick(e) {
@@ -953,7 +954,7 @@ function UploadForm(props) {
         dbRes = await supabase.from("promotion_proofs").upsert(row, { onConflict: "assignment_id" });
       }
       if (dbRes.error) throw dbRes.error;
-      var aRes = await supabase.from("promotion_mission_assignments").update({ status: ST.SUBMITTED, submitted_at: nowIso, status_reason: null }).eq("id", assignment.id);
+      var aRes = await supabase.from("promotion_mission_assignments").update({ status: ST.SUBMITTED, submitted_at: nowIso, status_reason: skipped ? "건너뛰기(기존 게시물 존재)" : null }).eq("id", assignment.id);
       if (aRes.error) throw aRes.error;
       props.onDone();
     } catch(e) { setErr("업로드 중 오류가 발생했습니다. 다시 시도해 주세요."); console.error(e); }
@@ -988,6 +989,14 @@ function UploadForm(props) {
       )}
       <input ref={fileRef} type="file" accept="image/*" onChange={pick} style={{ display: "none" }} />
       {err && <div style={{ fontSize: 13, color: "#C0392B", marginBottom: 10, fontWeight: 600 }}>{err}</div>}
+      <button
+        onClick={function() { setSkipped(!skipped); }}
+        style={{ width: "100%", marginBottom: 10, border: skipped ? "1px solid #0869F4" : "1px solid #D5DEEC", background: skipped ? "#EAF2FF" : "#fff", color: skipped ? "#0869F4" : "#5A6478", borderRadius: 14, padding: "12px 16px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+      >
+        <span style={{ width: 18, height: 18, borderRadius: 5, border: skipped ? "none" : "1.5px solid #C2CCDC", background: skipped ? "#0869F4" : "#fff", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, lineHeight: 0 }}>{skipped ? "✓" : ""}</span>
+        건너뛰기 (이미 관련 게시물이 있어요)
+      </button>
+      <div style={{ fontSize: 11, color: "#A8B2C5", marginBottom: 10, textAlign: "center", lineHeight: "16px" }}>같은 내용이 이미 게시판에 있어 새 글을 올리지 않은 경우 표시해주세요. 인증 사진은 그대로 업로드해주세요.</div>
       <button style={btnPrimary({ opacity: busy ? 0.7 : 1 })} disabled={busy} onClick={submit}>
         {busy ? "업로드 중..." : existingProof ? "사진 수정 완료" : "인증 제출"}
       </button>
@@ -2673,9 +2682,12 @@ function AdminCerts() {
     if (r1.data) {
       var r2 = await supabase.from("promotion_assignment_status_view").select("*").eq("mission_id", r1.data.id);
       var rp = await supabase.from("promotion_proofs").select("*").eq("mission_id", r1.data.id);
+      var ra = await supabase.from("promotion_mission_assignments").select("id,status_reason").eq("mission_id", r1.data.id);
       var proofMap = {};
       (rp.data || []).forEach(function(p) { proofMap[p.assignment_id] = p; });
-      setProofs((r2.data || []).map(function(a) { return Object.assign({}, a, { proof: proofMap[a.id] || null }); }).sort(function(a, b) {
+      var reasonMap = {};
+      (ra.data || []).forEach(function(x) { reasonMap[x.id] = x.status_reason; });
+      setProofs((r2.data || []).map(function(a) { return Object.assign({}, a, { proof: proofMap[a.id] || null, status_reason: (reasonMap[a.id] != null ? reasonMap[a.id] : a.status_reason) }); }).sort(function(a, b) {
         var ra = statusSortRank(a.status);
         var rb = statusSortRank(b.status);
         if (ra !== rb) return ra - rb;
@@ -2830,6 +2842,7 @@ function AdminCerts() {
         <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 5 : 10 }}>
           {visibleProofs.map(function(proof) {
             var status = proof.status;
+            var isSkip = String(proof.status_reason || "").indexOf("건너뛰기") !== -1;
             if (isMobile) {
               return (
                 <div key={proof.id} style={{ background: "#fff", borderRadius: 12, padding: "7px 8px", boxShadow: "0 4px 12px rgba(33,64,120,0.05)", border: "1px solid #EDF2FA" }}>
@@ -2839,9 +2852,12 @@ function AdminCerts() {
                         <span style={{ fontSize: 13, fontWeight: 900, color: INK, whiteSpace: "nowrap" }}>{proof.member_name}</span>
                         <span style={{ fontSize: 11, fontWeight: 800, color: SUB, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>- {proof.school}</span>
                       </div>
-                      <div style={{ fontSize: 10, color: SUB, fontWeight: 800, marginTop: 1 }}>{proof.gi}{proof.submitted_at ? " · " + fmtTime(proof.submitted_at) : ""}</div>
+                      <div style={{ fontSize: 10, color: SUB, fontWeight: 800, marginTop: 1 }}>{proof.gi}{proof.submitted_at ? " · " + fmtTime(proof.submitted_at) : ""}{isSkip ? " · 건너뛰기" : ""}</div>
                     </div>
-                    <button onClick={function() { openStatusEdit(proof); }} style={{ border: "none", cursor: "pointer", fontFamily: FONT, fontSize: 10, fontWeight: 900, color: stColor(status), background: stBg(status), padding: "4px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>{stLabel(status)}</button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      {isSkip && <span style={{ fontSize: 10, fontWeight: 900, color: "#0869F4", background: "#EAF2FF", padding: "3px 7px", borderRadius: 999, whiteSpace: "nowrap" }}>건너뛰기</span>}
+                      <button onClick={function() { openStatusEdit(proof); }} style={{ border: "none", cursor: "pointer", fontFamily: FONT, fontSize: 10, fontWeight: 900, color: stColor(status), background: stBg(status), padding: "4px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>{stLabel(status)}</button>
+                    </div>
                   </div>
                   {proof.proof && (
                     <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 1 }}>
@@ -2862,6 +2878,7 @@ function AdminCerts() {
                   <div style={{ fontSize: 12, color: SUB }}>{proof.gi + " · " + proof.school}</div>
                 </div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: stColor(status), background: stBg(status), padding: "5px 14px", borderRadius: 999 }}>{stLabel(status)}</span>
+                {isSkip && <span style={{ fontSize: 12, fontWeight: 800, color: "#0869F4", background: "#EAF2FF", padding: "5px 12px", borderRadius: 999 }}>건너뛰기</span>}
                 {proof.proof && proof.proof.proof_image_url && (
                   <button onClick={function() { setZoom(proof); }} style={btnSmall({ background: "#F0F4FB", color: BLUE })}>캡처 보기</button>
                 )}

@@ -1,6 +1,8 @@
 import { requireSupabase, TABLES } from './baseService'
-import { ACTIVITY_WEATHER_PRESETS, calculateActivityWeather, OFFLINE_EVENT_TYPES, OFFLINE_TARGET_POINTS } from '../utils/activityWeather'
-export { calculateActivityWeather, gradeFor, weatherFor } from '../utils/activityWeather'
+import { ACTIVITY_WEATHER_PRESETS, calculateActivityWeather, calculateWeatherFromEvents, WEATHER_BASE_SCORE, OFFLINE_EVENT_TYPES, OFFLINE_TARGET_POINTS } from '../utils/activityWeather'
+export { calculateActivityWeather, calculateWeatherFromEvents, gradeFor, weatherFor } from '../utils/activityWeather'
+// eslint-disable-next-line no-unused-vars
+const _legacyConsts = { OFFLINE_EVENT_TYPES, OFFLINE_TARGET_POINTS }
 
 // 지도교수·고문은 활동날씨 산정 대상이 아닙니다.
 const WEATHER_EXEMPT_TITLES = ['지도교수', '고문']
@@ -8,11 +10,10 @@ export function isWeatherExempt(member) {
   return WEATHER_EXEMPT_TITLES.includes(String(member?.position_title || '').trim())
 }
 function weatherExemptResult() {
-  const empty = (maxPoints) => ({ score: null, rawScore: null, points: 0, maxPoints, used: false, assumedDefault: false })
   return {
     exempt: true, score: null, grade: '미적용', weatherType: 'collecting',
     message: '지도교수·고문은 활동날씨 대상이 아니에요.', isCollectingData: false,
-    breakdown: { promotion: empty(40), offline: empty(30), peerReview: empty(30) },
+    base: WEATHER_BASE_SCORE, totalDelta: 0, events: [],
   }
 }
 
@@ -21,18 +22,15 @@ function testWeatherResultForMember(member) {
   if (!name.includes('[테스트]')) return null
   const preset = ACTIVITY_WEATHER_PRESETS.find((item) => name.includes(item.grade) || name.includes(item.weatherType))
   if (!preset) return null
-
-  const score = Number(preset.score)
-  const basePoints = Math.min(70, score)
-  const promotionScore = basePoints / 70 * 100
-  const offlineScore = basePoints / 70 * 100
-  const peerReviewScore = Math.max(0, score - basePoints) / 30 * 100
-
   return {
-    ...calculateActivityWeather({ promotionScore, offlineScore, peerReviewScore }),
+    score: Number(preset.score),
     grade: preset.grade,
     weatherType: preset.weatherType,
     message: preset.message,
+    isCollectingData: false,
+    base: WEATHER_BASE_SCORE,
+    totalDelta: Number(preset.score) - WEATHER_BASE_SCORE,
+    events: [],
     testWeather: true,
     raw: { testWeatherPreset: preset },
   }
@@ -198,70 +196,26 @@ export async function getMemberActivityWeather(member) {
   const supabase = requireSupabase()
   const memberId = member?.id ?? member  // 하위 호환
 
-  const [promotionRes, attendanceRes, peerRes, peerSummaryRes, eventRes, sessionRes, recordRes] = await Promise.all([
-    // 에타 홍보: promotion_member_progress_view의 member_id가 UUID일 수도, 정수 id 참조일 수도 있어 후보를 넓게 매칭합니다.
-    supabase.from(TABLES.progressView).select('*'),
-
-    // mast_member_id가 비어 있는 기존 회원도 홍보 View의 UUID로 연결할 수 있도록 전체 요약을 읽습니다.
-    supabase.from(TABLES.attendanceSummary).select('*'),
-
-    // 동료평가: reviewee_id = team_matching_members.id (integer)
-    supabase.from(TABLES.peerReviews).select('*').eq('reviewee_id', memberId),
-    safeSelectPeerReviewSummary(),
-    supabase.from(TABLES.scoreEvents).select('*').eq('member_id', memberId).eq('verified', true),
-    supabase.from('activity_sessions').select('id,session_mode,is_orientation,target_generations,starts_at'),
-    supabase.from('activity_attendance_records').select('member_id,session_id,status'),
-  ])
-
-  const promotionRow = findPromotionRow(promotionRes.data ?? [], member)
-  const attendanceRow = findAttendanceRow(attendanceRes.data ?? [], member, promotionRow)
-  const promotionScore = calcPromotionScore(promotionRow)
-  const externalId = member?.mast_member_id ?? promotionRow?.member_id ?? attendanceRow?.member_id
-  const allSessionsData = sessionRes.error ? [] : (sessionRes.data ?? [])
-  const byMode = calcAttendanceByMode(externalId, allSessionsData, recordRes.error ? [] : recordRes.data)
-  // 신입 기수 OT 전: 출석 기본치 100%. 그 외: 모임유형별 출석률(없으면 기존 방식)
-  const offlineScore = isPreOt(member?.generation, allSessionsData)
-    ? 100
-    : (byMode !== null ? byMode : calcOfflineScore(attendanceRow, eventRes.data))
-  const peerSummaryRow = findPeerSummaryRow(peerSummaryRes.data ?? [], memberId)
-  const peerReviewScore = normalizePercent(peerSummaryRow?.peer_review_score ?? peerSummaryRow?.average_score ?? peerSummaryRow?.score) ?? calcPeerReviewScore(peerRes.data)
+  // 70점 시작 + 관리자가 입력한 가감점 이벤트 합산
+  const eventRes = await supabase
+    .from(TABLES.scoreEvents).select('*')
+    .eq('member_id', memberId).eq('verified', true)
+  const scoreEvents = eventRes.data ?? []
 
   return {
-    ...calculateActivityWeather({ promotionScore, offlineScore, peerReviewScore }),
-    raw: {
-      promotionData: promotionRow,
-      attendanceSummary: attendanceRow,
-      peerReviewSummary: peerSummaryRow,
-      peerReviews: peerRes.data ?? [],
-      scoreEvents: eventRes.data ?? [],
-    },
+    ...calculateWeatherFromEvents(scoreEvents),
+    raw: { scoreEvents },
   }
 }
 
 /**
  * 전체 회원 활동날씨 일괄 계산 (관리자용)
- * @param {Array<{ id: number, mast_member_id: string }>} members
+ * @param {Array<{ id: number }>} members
  */
 export async function getAllActivityWeather(members) {
   const supabase = requireSupabase()
-
-  const [promoRes, attendanceRes, peerRes, peerSummaryRes, eventRes, sessionRes, recordRes] = await Promise.all([
-    supabase.from(TABLES.progressView).select('*'),
-    supabase.from(TABLES.attendanceSummary).select('*'),
-    supabase.from(TABLES.peerReviews).select('*'),
-    safeSelectPeerReviewSummary(),
-    supabase.from(TABLES.scoreEvents).select('*').eq('verified', true),
-    supabase.from('activity_sessions').select('id,session_mode,is_orientation,target_generations,starts_at'),
-    supabase.from('activity_attendance_records').select('member_id,session_id,status'),
-  ])
-
-  const allPromo = promoRes.data ?? []
-  const allAttendance = attendanceRes.data ?? []
-  const allPeer = peerRes.data ?? []
-  const allPeerSummary = peerSummaryRes.data ?? []
+  const eventRes = await supabase.from(TABLES.scoreEvents).select('*').eq('verified', true)
   const allEvents = eventRes.data ?? []
-  const allSessions = sessionRes.error ? [] : (sessionRes.data ?? [])
-  const allRecords = recordRes.error ? [] : (recordRes.data ?? [])
 
   return members.map((member) => {
     const testWeather = testWeatherResultForMember(member)
@@ -269,30 +223,11 @@ export async function getAllActivityWeather(members) {
     if (isWeatherExempt(member)) {
       return { ...member, activityWeather: weatherExemptResult(), weatherExempt: true, raw: {} }
     }
-    const promoRow = findPromotionRow(allPromo, member)
-    // attendance_summary: member_id = mast_member_id (uuid)
-    const attendanceRow = findAttendanceRow(allAttendance, member, promoRow)
-    const peerReviews = allPeer.filter((r) => Number(r.reviewee_id) === Number(member.id))
-    const peerSummaryRow = findPeerSummaryRow(allPeerSummary, member.id)
     const scoreEvents = allEvents.filter((event) => Number(event.member_id) === Number(member.id))
-    const externalId = member?.mast_member_id ?? promoRow?.member_id ?? attendanceRow?.member_id
-    const byMode = calcAttendanceByMode(externalId, allSessions, allRecords)
-    const preOt = isPreOt(member?.generation, allSessions)
-
     return {
       ...member,
-      activityWeather: calculateActivityWeather({
-        promotionScore: calcPromotionScore(promoRow),
-        offlineScore: preOt ? 100 : (byMode !== null ? byMode : calcOfflineScore(attendanceRow, scoreEvents)),
-        peerReviewScore: normalizePercent(peerSummaryRow?.peer_review_score ?? peerSummaryRow?.average_score ?? peerSummaryRow?.score) ?? calcPeerReviewScore(peerReviews),
-      }),
-      raw: {
-        promotionData: promoRow,
-        attendanceSummary: attendanceRow,
-        peerReviewSummary: peerSummaryRow,
-        peerReviews,
-        scoreEvents,
-      },
+      activityWeather: calculateWeatherFromEvents(scoreEvents),
+      raw: { scoreEvents },
     }
   })
 }

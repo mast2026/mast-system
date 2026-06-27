@@ -5,25 +5,38 @@ const RECORD_TABLE = 'activity_attendance_records'
 const SUMMARY_VIEW = 'activity_attendance_summary_view'
 const LEGACY_MEMBERS_TABLE = 'members'
 
-// 지금 이 시점에 실제로 출석 체크가 가능한 모임만 반환합니다.
-// (홈 화면 "오늘 할 일"에서 출석 모임이 없을 때 버튼이 뜨지 않도록 사용)
+const toMs = (value) => {
+  if (!value) return null
+  const time = new Date(value).getTime()
+  return Number.isNaN(time) ? null : time
+}
+
+// 모임의 "현재 상태"를 시간 기준으로 계산합니다.
+// 관리자가 status를 'scheduled'로 둬도, 시작 시각이 지나면 자동으로 '출석 가능(open)'으로 봅니다.
+//  - 'closed' : 마감/취소됐거나, 출석 마감 시각이 지남
+//  - 'scheduled' : 아직 출석 시작 전(예정)
+//  - 'open' : 지금 출석 체크 가능
+export function effectiveSessionStatus(session, now = Date.now()) {
+  if (!session) return 'closed'
+  const raw = String(session.status ?? 'scheduled').toLowerCase()
+  if (['closed', 'cancelled', 'finished', 'completed'].includes(raw)) return 'closed'
+  const start = toMs(session.starts_at)
+  // 출석 시작: 코드 오픈 시각 → 없으면 모임 시작 시각
+  const openAt = toMs(session.attendance_open_at) ?? start
+  // 출석 마감: 코드 마감 → 종료 시각 → (시작+6시간) 순으로 결정
+  const closeAt = toMs(session.attendance_close_at)
+    ?? toMs(session.ends_at)
+    ?? (start != null ? start + 6 * 60 * 60 * 1000 : null)
+  // 시간 정보가 전혀 없으면 status에 따름
+  if (openAt == null && closeAt == null) return raw === 'open' ? 'open' : 'scheduled'
+  if (openAt != null && now < openAt) return 'scheduled'
+  if (closeAt != null && now > closeAt) return 'closed'
+  return 'open'
+}
+
+// 지금 이 시점에 실제로 출석 체크가 가능한 모임인지 (시간 기준)
 export function isAttendableNow(session, now = Date.now()) {
-  if (!session) return false
-  const status = String(session.status ?? 'scheduled').toLowerCase()
-  if (['closed', 'cancelled', 'finished', 'completed'].includes(status)) return false
-  const toMs = (value) => {
-    if (!value) return null
-    const time = new Date(value).getTime()
-    return Number.isNaN(time) ? null : time
-  }
-  const openAt = toMs(session.attendance_open_at) ?? toMs(session.starts_at)
-  const closeAt = toMs(session.attendance_close_at) ?? toMs(session.ends_at)
-    ?? (toMs(session.starts_at) != null ? toMs(session.starts_at) + 3 * 60 * 60 * 1000 : null)
-  if (openAt != null && now < openAt) return false
-  if (closeAt != null && now > closeAt) return false
-  // 출석 가능 시간대가 전혀 지정되지 않은 모임은 status가 명시적으로 'open'일 때만 노출
-  if (openAt == null && closeAt == null) return status === 'open'
-  return true
+  return effectiveSessionStatus(session, now) === 'open'
 }
 
 export async function getActiveAttendanceSessions() {
@@ -96,12 +109,15 @@ export async function submitAttendance({ currentMember, sessionId, code }) {
   throwIfError(existingError)
   if (existing) throw new Error('이미 출석이 완료된 모임입니다.')
 
+  // 정시 기준 시각(ontime_at) 이후 체크하면 지각. 없으면 모임 시작 일시 기준.
+  // 지각 30분 이내 -1점, 30분 초과 -3점 (감점은 points에 기록).
+  const tier = classifyAttendance(session, Date.now())
   const payload = {
     session_id: session.id,
     member_id: legacyMember.id,
-    status: 'present',
+    status: tier.status,
     checked_at: new Date().toISOString(),
-    points: Number(session.base_points ?? 1),
+    points: tier.status === 'present' ? Number(session.base_points ?? 1) : tier.points,
   }
 
   const { data, error } = await client
@@ -110,7 +126,20 @@ export async function submitAttendance({ currentMember, sessionId, code }) {
     .select('*')
     .single()
   throwIfError(error)
-  return data
+  return { ...data, lateInfo: tier }
+}
+
+// 출석 시각을 정시 기준과 비교해 present / 지각(30분 이내, -1) / 지각(30분 초과, -3) 으로 분류
+export function classifyAttendance(session, now = Date.now()) {
+  const ontimeRaw = session?.ontime_at ?? session?.starts_at ?? null
+  const ontimeMs = ontimeRaw ? new Date(ontimeRaw).getTime() : null
+  if (ontimeMs == null || Number.isNaN(ontimeMs)) {
+    return { status: 'present', points: 0, label: '출석', minutesLate: 0 }
+  }
+  const minutesLate = Math.floor((now - ontimeMs) / 60000)
+  if (minutesLate > 30) return { status: 'late', points: -3, label: '지각(30분 초과)', minutesLate }
+  if (minutesLate > 0) return { status: 'late', points: -1, label: '지각(30분 이내)', minutesLate }
+  return { status: 'present', points: 0, label: '출석', minutesLate: 0 }
 }
 
 export async function findAttendanceMember(currentMember) {
@@ -150,24 +179,19 @@ export async function findAttendanceMember(currentMember) {
 }
 
 function validateAttendanceSession(session, code) {
-  const status = String(session.status ?? '').toLowerCase()
-  if (status && !['open', 'scheduled'].includes(status)) {
-    throw new Error(status === 'closed' ? '출석이 마감된 모임입니다.' : '출석할 수 없는 모임입니다.')
-  }
+  // status 문자열이 아니라 시간 기준 상태로 판정합니다. (시작 시각이 지나면 'scheduled' 라도 출석 가능)
+  const eff = effectiveSessionStatus(session)
+  if (eff === 'scheduled') throw new Error('아직 출석 가능 시간이 아닙니다.')
+  if (eff === 'closed') throw new Error('출석 가능 시간이 지났거나 마감된 모임입니다.')
 
-  const now = Date.now()
-  if (session.attendance_open_at && now < new Date(session.attendance_open_at).getTime()) {
-    throw new Error('아직 출석 가능 시간이 아닙니다.')
-  }
-  if (session.attendance_close_at && now > new Date(session.attendance_close_at).getTime()) {
-    throw new Error('출석 가능 시간이 지났습니다.')
-  }
-
+  // 출석코드: 코드가 실제로 설정된 모임만 검사합니다. (코드 사용 ON 인데 코드 미설정이면 코드 없이 통과)
   if (session.attendance_code_enabled) {
     const expected = String(session.attendance_code ?? '').trim()
-    const received = String(code ?? '').trim()
-    if (!received) throw new Error('출석 인증코드를 입력해 주세요.')
-    if (expected && expected !== received) throw new Error('출석 인증코드가 일치하지 않습니다.')
+    if (expected) {
+      const received = String(code ?? '').trim()
+      if (!received) throw new Error('출석 인증코드를 입력해 주세요.')
+      if (expected !== received) throw new Error('출석 인증코드가 일치하지 않습니다.')
+    }
   }
 }
 
