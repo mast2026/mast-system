@@ -33,10 +33,16 @@ export async function getMember(id) {
 }
 
 export async function findMemberByName(name) {
+  const list = await findMembersByName(name)
+  return list[0] ?? null
+}
+
+// 같은 이름의 회원이 여러 명(동명이인)일 수 있으므로 전부 반환합니다.
+export async function findMembersByName(name) {
   const { data: members, error } = await requireSupabase().from(TABLES.members).select(PUBLIC_MEMBER_FIELDS).order('id', { ascending: true })
   throwIfError(error)
-  const keyword = name.trim().toLocaleLowerCase()
-  return members.find((member) => String(member.name ?? '').trim().toLocaleLowerCase() === keyword) ?? null
+  const keyword = String(name ?? '').trim().toLocaleLowerCase()
+  return (members ?? []).filter((member) => String(member.name ?? '').trim().toLocaleLowerCase() === keyword)
 }
 
 export async function checkHasPassword(memberId) {
@@ -69,20 +75,30 @@ const extractNum = (v) => String(v ?? '').replace(/[^0-9]/g, '')
 const normalizeStr = (v) => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
 
 export async function loginFirstTime(name, school, generation, newPassword, confirmPassword, { roles } = {}) {
-  const member = await findMemberByName(name)
-  if (!member) throw new Error('일치하는 회원이 없습니다.')
-  if (roles?.length && !roles.includes(member.role)) throw new Error('선택한 로그인 유형과 회원 권한이 일치하지 않습니다.')
+  let candidates = await findMembersByName(name)
+  if (roles?.length) candidates = candidates.filter((m) => roles.includes(m.role))
+  if (!candidates.length) throw new Error('일치하는 회원이 없습니다.')
 
-  const alreadySet = await checkHasPassword(member.id)
-  if (alreadySet) throw new Error('이미 비밀번호가 설정된 계정입니다. 이름과 비밀번호로 로그인하세요.')
+  // DB에 학교/기수가 있으면 일치 검사, 비어 있으면 입력값 인정. 동명이인은 학교/기수로 구분.
+  const inSchool = normalizeStr(school)
+  const inGen = extractNum(generation)
+  const matchesIdentity = (m) => {
+    const dbSchool = normalizeStr(m.school)
+    const dbGen = extractNum(m.generation)
+    return (!dbSchool || dbSchool === inSchool) && (dbGen === '' || (inGen !== '' && dbGen === inGen))
+  }
 
-  // DB에 학교/기수가 있으면 일치 검사, 비어 있으면 입력값을 그대로 인정(가입 막힘 방지)
-  const dbSchool = normalizeStr(member.school)
-  const genA = extractNum(member.generation)
-  const genB = extractNum(generation)
-  const schoolMatch = !dbSchool || dbSchool === normalizeStr(school)
-  const generationMatch = genA === '' || (genB !== '' && genA === genB)
-  if (!schoolMatch || !generationMatch) throw new Error('학교 또는 기수 정보가 일치하지 않습니다.')
+  // 비밀번호 미설정 + 학교/기수 일치 후보 선택
+  let member = null
+  for (const m of candidates) {
+    if (await checkHasPassword(m.id)) continue
+    if (matchesIdentity(m)) { member = m; break }
+  }
+  if (!member) {
+    const passwordStates = await Promise.all(candidates.map((m) => checkHasPassword(m.id)))
+    if (passwordStates.every(Boolean)) throw new Error('이미 비밀번호가 설정된 계정입니다. 이름과 비밀번호로 로그인하세요.')
+    throw new Error('학교 또는 기수 정보가 일치하지 않습니다.')
+  }
 
   if (!newPassword || newPassword.length < 4) throw new Error('비밀번호는 4자 이상 입력하세요.')
   if (newPassword !== confirmPassword) throw new Error('비밀번호 확인이 일치하지 않습니다.')
@@ -108,20 +124,23 @@ export async function loginFirstTime(name, school, generation, newPassword, conf
 }
 
 export async function loginWithPassword(name, password, { roles } = {}) {
-  const member = await findMemberByName(name)
-  if (!member) throw new Error('일치하는 회원이 없습니다.')
-  if (roles?.length && !roles.includes(member.role)) throw new Error('선택한 로그인 유형과 회원 권한이 일치하지 않습니다.')
+  let candidates = await findMembersByName(name)
+  if (roles?.length) candidates = candidates.filter((m) => roles.includes(m.role))
+  if (!candidates.length) throw new Error('일치하는 회원이 없습니다.')
   if (!password || password.length < 4) throw new Error('비밀번호는 4자 이상 입력하세요.')
-
-  const storedHashes = await getStoredPasswordHashes(member.id)
-
-  if (!storedHashes.length) throw new Error('비밀번호가 설정되지 않았습니다. 첫 로그인을 진행해 주세요.')
 
   const nextHash = await hashPassword(password)
   const trimmedPassword = String(password)
-  const isMatched = storedHashes.some((storedHash) => storedHash === nextHash || storedHash === trimmedPassword)
-  if (!isMatched) throw new Error('비밀번호가 일치하지 않습니다.')
-  return member
+  let anyHasPassword = false
+  // 동명이인 후보를 모두 검사해, 비밀번호가 일치하는 회원으로 로그인합니다.
+  for (const member of candidates) {
+    const storedHashes = await getStoredPasswordHashes(member.id)
+    if (!storedHashes.length) continue
+    anyHasPassword = true
+    if (storedHashes.some((storedHash) => storedHash === nextHash || storedHash === trimmedPassword)) return member
+  }
+  if (!anyHasPassword) throw new Error('비밀번호가 설정되지 않았습니다. 첫 로그인을 진행해 주세요.')
+  throw new Error('비밀번호가 일치하지 않습니다.')
 }
 
 async function getStoredPasswordHashes(memberId) {

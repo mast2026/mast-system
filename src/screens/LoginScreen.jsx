@@ -57,6 +57,10 @@ export default function LoginScreen() {
     const keyword = name.trim().toLocaleLowerCase()
     return members.find((m) => String(m.name ?? '').trim().toLocaleLowerCase() === keyword)
   }, [members, name])
+  const sameNameCount = useMemo(() => {
+    const keyword = name.trim().toLocaleLowerCase()
+    return members.filter((m) => String(m.name ?? '').trim().toLocaleLowerCase() === keyword).length
+  }, [members, name])
 
   useEffect(() => {
     if (!selectedMember) { setHasPassword(null); return }
@@ -75,17 +79,17 @@ export default function LoginScreen() {
     try {
       if (!selectedMember) throw new Error('회원 목록에서 일치하는 이름을 찾지 못했습니다. 이름을 정확히 입력하거나 목록에서 선택해 주세요.')
       if (isCheckingPw) throw new Error('계정 정보를 확인 중입니다. 잠시 후 다시 눌러 주세요.')
+      const withTimeout = (p) => Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Error('DB 연결을 확인해 주세요.')), 8000))])
+      const tryPassword = () => withTimeout(loginWithPassword(name, password, { roles: modeConfig.roles }))
+      const tryFirst = () => withTimeout(loginFirstTime(name, school, generation, password, confirmPassword, { roles: modeConfig.roles }))
       let member
-      if (isFirstLogin) {
-        member = await Promise.race([
-          loginFirstTime(name, school, generation, password, confirmPassword, { roles: modeConfig.roles }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('DB 연결을 확인해 주세요.')), 8000)),
-        ])
-      } else {
-        member = await Promise.race([
-          loginWithPassword(name, password, { roles: modeConfig.roles }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('DB 연결을 확인해 주세요.')), 8000)),
-        ])
+      try {
+        member = isFirstLogin ? await tryFirst() : await tryPassword()
+      } catch (e1) {
+        // 동명이인 등으로 첫로그인/일반로그인 분기가 어긋난 경우 반대 경로도 시도
+        if (/설정되지 않았/.test(e1.message) && school && generation) member = await tryFirst()
+        else if (/이미 비밀번호가 설정/.test(e1.message)) member = await tryPassword()
+        else throw e1
       }
       login(member)
       navigate(modeConfig.next)
@@ -125,17 +129,17 @@ export default function LoginScreen() {
           <datalist id="member-names">{members.map((m) => <option key={m.id} value={m.name} />)}</datalist>
         </div>
 
-        {isFirstLogin && <div className="login-input">
+        {(isFirstLogin || sameNameCount > 1) && <div className="login-input">
           <GraduationCap className="login-input-icon" />
-          <select value={generation} onChange={(e) => setGeneration(e.target.value)} required>
+          <select value={generation} onChange={(e) => setGeneration(e.target.value)} required={isFirstLogin}>
             <option value="">기수를 선택하세요</option>
             {generationOptions.map((value) => <option key={value} value={value}>{value}기</option>)}
           </select>
         </div>}
 
-        {isFirstLogin && <div className="login-input">
+        {(isFirstLogin || sameNameCount > 1) && <div className="login-input">
           <GraduationCap className="login-input-icon" />
-          <input value={school} onChange={(e) => setSchool(e.target.value)} placeholder="학교명을 입력하세요" autoComplete="organization" required />
+          <input value={school} onChange={(e) => setSchool(e.target.value)} placeholder="학교명을 입력하세요" autoComplete="organization" required={isFirstLogin} />
         </div>}
 
         <PasswordField value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호를 입력하세요" autoComplete={isFirstLogin ? 'new-password' : 'current-password'} minLength={4} required />
@@ -145,6 +149,7 @@ export default function LoginScreen() {
         {name.trim() && !selectedMember && !loading && <div className="login-v2-note warning">회원 목록에서 같은 이름을 찾지 못했어요. 이름을 정확히 입력해 주세요.</div>}
         {isCheckingPw && <div className="login-v2-note"><LoadingCloud size="small" text="계정 확인 중..." /></div>}
         {isFirstLogin && <div className="login-v2-note success">첫 로그인이에요. 학교·기수 확인 후 비밀번호를 설정하면 가입됩니다.</div>}
+        {!isFirstLogin && sameNameCount > 1 && <div className="login-v2-note">같은 이름의 회원이 여러 명이에요. 학교·기수를 함께 입력하면 정확히 로그인됩니다.</div>}
         {info && <div className="login-v2-note">{info}</div>}
         {message && <div className="login-v2-note error">{message}</div>}
         {error && <div className="login-v2-note error">{error.message}</div>}
