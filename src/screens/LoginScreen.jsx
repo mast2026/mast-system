@@ -36,6 +36,7 @@ export default function LoginScreen() {
   const [name, setName] = useState('')
   const [school, setSchool] = useState('')
   const [generation, setGeneration] = useState('')
+  const [pickedId, setPickedId] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [message, setMessage] = useState('')
@@ -57,10 +58,11 @@ export default function LoginScreen() {
     const keyword = name.trim().toLocaleLowerCase()
     return members.find((m) => String(m.name ?? '').trim().toLocaleLowerCase() === keyword)
   }, [members, name])
-  const sameNameCount = useMemo(() => {
+  const sameNameMembers = useMemo(() => {
     const keyword = name.trim().toLocaleLowerCase()
-    return members.filter((m) => String(m.name ?? '').trim().toLocaleLowerCase() === keyword).length
+    return members.filter((m) => String(m.name ?? '').trim().toLocaleLowerCase() === keyword)
   }, [members, name])
+  const sameNameCount = sameNameMembers.length
 
   useEffect(() => {
     if (!selectedMember) { setHasPassword(null); return }
@@ -129,18 +131,29 @@ export default function LoginScreen() {
           <datalist id="member-names">{members.map((m) => <option key={m.id} value={m.name} />)}</datalist>
         </div>
 
-        {(isFirstLogin || sameNameCount > 1) && <div className="login-input">
+        {sameNameCount > 1 ? <div className="login-input">
           <GraduationCap className="login-input-icon" />
-          <select value={generation} onChange={(e) => setGeneration(e.target.value)} required={isFirstLogin}>
-            <option value="">기수를 선택하세요</option>
-            {generationOptions.map((value) => <option key={value} value={value}>{value}기</option>)}
+          <select value={pickedId} onChange={(e) => {
+            setPickedId(e.target.value)
+            const m = sameNameMembers.find((x) => String(x.id) === e.target.value)
+            if (m) { setSchool(m.school || ''); setGeneration(String(m.generation ?? '').replace(/[^0-9]/g, '')) }
+          }} required>
+            <option value="">본인 학교·기수를 선택하세요</option>
+            {sameNameMembers.map((m) => <option key={m.id} value={m.id}>{(m.school || '학교 미정')} · {String(m.generation ?? '').replace(/[^0-9]/g, '') || '-'}기</option>)}
           </select>
-        </div>}
-
-        {(isFirstLogin || sameNameCount > 1) && <div className="login-input">
-          <GraduationCap className="login-input-icon" />
-          <input value={school} onChange={(e) => setSchool(e.target.value)} placeholder="학교명을 입력하세요" autoComplete="organization" required={isFirstLogin} />
-        </div>}
+        </div> : (isFirstLogin && <>
+          <div className="login-input">
+            <GraduationCap className="login-input-icon" />
+            <select value={generation} onChange={(e) => setGeneration(e.target.value)} required>
+              <option value="">기수를 선택하세요</option>
+              {generationOptions.map((value) => <option key={value} value={value}>{value}기</option>)}
+            </select>
+          </div>
+          <div className="login-input">
+            <GraduationCap className="login-input-icon" />
+            <input value={school} onChange={(e) => setSchool(e.target.value)} placeholder="학교명을 입력하세요" autoComplete="organization" required />
+          </div>
+        </>)}
 
         <PasswordField value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호를 입력하세요" autoComplete={isFirstLogin ? 'new-password' : 'current-password'} minLength={4} required />
 
