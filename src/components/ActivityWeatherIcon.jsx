@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Cloud } from 'lucide-react'
 
 const weatherImages = {
@@ -11,6 +12,7 @@ const weatherImages = {
 }
 
 export default function ActivityWeatherIcon({ weather, size = 'medium' }) {
+  const [failed, setFailed] = useState(false)
   const key = weather?.weatherType ?? weather?.key ?? 'collecting'
   const src = weatherImages[key]
   return (
@@ -18,7 +20,9 @@ export default function ActivityWeatherIcon({ weather, size = 'medium' }) {
       className={`weather-icon weather-image-icon weather-${key} weather-size-${size}`}
       aria-label={`활동날씨 ${weather?.grade ?? weather?.label ?? '정보 없음'}`}
     >
-      {src ? <img src={src} alt="" aria-hidden="true" draggable="false" /> : <Cloud />}
+      {src && !failed
+        ? <img src={src} alt="" aria-hidden="true" draggable="false" onError={() => setFailed(true)} />
+        : <Cloud />}
     </span>
   )
 }
