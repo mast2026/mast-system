@@ -200,9 +200,10 @@ export function classifyAttendance(session, now = Date.now()) {
     return { status: 'present', points: 0, label: '출석', minutesLate: 0 }
   }
   const minutesLate = Math.floor((now - ontimeMs) / 60000)
+  // 10분 이내는 지각이 아니라 출석으로 처리
   if (minutesLate > 30) return { status: 'late', points: -3, label: '지각(30분 초과)', minutesLate }
-  if (minutesLate > 0) return { status: 'late', points: -1, label: '지각(30분 이내)', minutesLate }
-  return { status: 'present', points: 0, label: '출석', minutesLate: 0 }
+  if (minutesLate > 10) return { status: 'late', points: -1, label: '지각(10~30분)', minutesLate }
+  return { status: 'present', points: 0, label: '출석', minutesLate }
 }
 
 export async function findAttendanceMember(currentMember) {

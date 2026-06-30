@@ -2,9 +2,25 @@ import { requireSupabase, TABLES } from './baseService'
 import { ACTIVITY_WEATHER_PRESETS, calculateActivityWeather, calculateWeatherFromEvents, WEATHER_BASE_SCORE, OFFLINE_EVENT_TYPES, OFFLINE_TARGET_POINTS } from '../utils/activityWeather'
 import { findAttendanceMember } from './attendanceService'
 
-// 지각 감점은 점수 이벤트로 저장하지 않고 출석 기록에서 실시간 계산합니다.
-// (과거에 저장된 이벤트 타입은 합산에서 제외해 중복/잔존을 방지)
-const LATE_EVENT_TYPES = ['attendance_late', 'ot_late', 'ot_late_30']
+// 아래 타입은 저장 점수가 아니라 기록에서 실시간 계산합니다(합산에서 제외해 중복/잔존 방지).
+//  - 출석 점수(attendance, 구버전 ot_late 등): 출석 기록에서 계산
+//  - 에타 미참여(eta_miss): 마감 지난 홍보 미션 미제출에서 계산
+const DERIVED_EVENT_TYPES = ['attendance', 'attendance_late', 'ot_late', 'ot_late_30', 'eta_miss']
+const SUBMITTED_PROMO = ['submitted', 'approved', 'late']
+
+// 마감이 지난 홍보 미션 중 미제출 건 → '에타 미참여 -2'
+function promotionMissItems(assignments, missionById, now) {
+  const items = []
+  for (const a of assignments ?? []) {
+    const m = missionById && missionById.get(String(a.mission_id))
+    if (!m) continue
+    const due = m.due_at ? new Date(m.due_at).getTime() : null
+    if (due == null || now < due) continue // 아직 마감 전
+    if (SUBMITTED_PROMO.includes(String(a.status ?? '').toLowerCase())) continue // 제출/승인/지각완료 제외
+    items.push({ id: `promo-${a.id}`, event_type: 'eta_miss', points: -2, metadata: { reason: `${m.title || '에타 미션'} 미참여` } })
+  }
+  return items
+}
 
 function norm(v) { return String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ') }
 function genNum(v) { return String(v ?? '').replace(/[^0-9]/g, '') }
@@ -24,22 +40,23 @@ function matchLegacyMember(member, legacyList) {
 
 // 출석 기록을 활동날씨 가감점 항목으로 변환 (상태 자동 점수)
 //  - OT(오리엔테이션) 모임: 정참 +5 / 결석 -10 / 지각 -1·-3
-//  - 일반 모임: 지각 -1·-3 만 (정참·결석은 0)
+//  - 일반 모임: 점수 미반영 (지각 감점도 OT만 적용)
 function attendanceItemsFromRecords(records, sessionById) {
   const items = []
   for (const r of records ?? []) {
     const s = sessionById && sessionById.get(String(r.session_id))
     if (!s) continue
     const isOT = Boolean(s.is_orientation)
-    const title = s.title || (isOT ? 'OT' : '모임')
+    if (!isOT) continue // 일반 모임은 점수 미반영
+    const title = s.title || 'OT'
     const status = String(r.status)
     if (status === 'late') {
       const pts = Number(r.points)
       const points = Number.isFinite(pts) && pts < 0 ? pts : -1
       items.push({ id: `att-${r.id}`, event_type: 'attendance', points, metadata: { reason: `${title} 지각` } })
-    } else if (isOT && status === 'present') {
+    } else if (status === 'present') {
       items.push({ id: `att-${r.id}`, event_type: 'attendance', points: 5, metadata: { reason: `${title} 정참` } })
-    } else if (isOT && status === 'absent') {
+    } else if (status === 'absent') {
       items.push({ id: `att-${r.id}`, event_type: 'attendance', points: -10, metadata: { reason: `${title} 결석` } })
     }
   }
@@ -65,7 +82,9 @@ function weatherExemptResult() {
 function testWeatherResultForMember(member) {
   const name = String(member?.name || '')
   if (!name.includes('[테스트]')) return null
-  const preset = ACTIVITY_WEATHER_PRESETS.find((item) => name.includes(item.grade) || name.includes(item.weatherType))
+  // 공백 무시 매칭 (예: "구름낀해" ↔ 프리셋 "구름낀 해")
+  const nn = name.replace(/\s/g, '')
+  const preset = ACTIVITY_WEATHER_PRESETS.find((item) => nn.includes(String(item.grade).replace(/\s/g, '')) || nn.includes(item.weatherType))
   if (!preset) return null
   return {
     score: Number(preset.score),
@@ -241,23 +260,30 @@ export async function getMemberActivityWeather(member) {
   const supabase = requireSupabase()
   const memberId = member?.id ?? member  // 하위 호환
 
-  // 70점 시작 + 관리자 가감점(지각 제외) + 출석 기록에서 실시간 계산한 지각 감점
-  const [eventRes, legacyMember, sessionRes] = await Promise.all([
+  // 70점 시작 + 관리자 가감점 + 출석(실시간) + 에타 미참여(마감 후 실시간)
+  const [eventRes, legacyMember, sessionRes, missionRes] = await Promise.all([
     supabase.from(TABLES.scoreEvents).select('*').eq('member_id', memberId).eq('verified', true),
     findAttendanceMember(member).catch(() => null),
     supabase.from('activity_sessions').select('id,title,is_orientation'),
+    supabase.from('promotion_missions').select('id,title,due_at'),
   ])
-  const manual = (eventRes.data ?? []).filter((e) => !LATE_EVENT_TYPES.includes(e.event_type))
+  const manual = (eventRes.data ?? []).filter((e) => !DERIVED_EVENT_TYPES.includes(e.event_type))
   let attendanceItems = []
+  let promoItems = []
   if (legacyMember) {
-    const recRes = await supabase.from('activity_attendance_records').select('*').eq('member_id', legacyMember.id)
+    const [recRes, promoRes] = await Promise.all([
+      supabase.from('activity_attendance_records').select('*').eq('member_id', legacyMember.id),
+      supabase.from('promotion_mission_assignments').select('id,mission_id,status').eq('member_id', legacyMember.id),
+    ])
     const sessionById = new Map((sessionRes.data ?? []).map((s) => [String(s.id), s]))
+    const missionById = new Map((missionRes.data ?? []).map((m) => [String(m.id), m]))
     attendanceItems = attendanceItemsFromRecords(recRes.data ?? [], sessionById)
+    promoItems = promotionMissItems(promoRes.data ?? [], missionById, Date.now())
   }
 
   return {
-    ...calculateWeatherFromEvents([...manual, ...attendanceItems]),
-    raw: { scoreEvents: eventRes.data ?? [], attendanceItems },
+    ...calculateWeatherFromEvents([...manual, ...attendanceItems, ...promoItems]),
+    raw: { scoreEvents: eventRes.data ?? [], attendanceItems, promoItems },
   }
 }
 
@@ -267,16 +293,21 @@ export async function getMemberActivityWeather(member) {
  */
 export async function getAllActivityWeather(members) {
   const supabase = requireSupabase()
-  const [eventRes, recRes, sessionRes, legacyRes] = await Promise.all([
+  const [eventRes, recRes, sessionRes, legacyRes, promoAssignRes, missionRes] = await Promise.all([
     supabase.from(TABLES.scoreEvents).select('*').eq('verified', true),
     supabase.from('activity_attendance_records').select('*'),
     supabase.from('activity_sessions').select('id,title,is_orientation'),
     supabase.from('members').select('*'),
+    supabase.from('promotion_mission_assignments').select('id,mission_id,member_id,status'),
+    supabase.from('promotion_missions').select('id,title,due_at'),
   ])
   const allEvents = eventRes.data ?? []
   const allRecords = recRes.data ?? []
   const legacyList = legacyRes.data ?? []
+  const allPromo = promoAssignRes.data ?? []
   const sessionById = new Map((sessionRes.data ?? []).map((s) => [String(s.id), s]))
+  const missionById = new Map((missionRes.data ?? []).map((m) => [String(m.id), m]))
+  const now = Date.now()
 
   return members.map((member) => {
     const testWeather = testWeatherResultForMember(member)
@@ -284,14 +315,16 @@ export async function getAllActivityWeather(members) {
     if (isWeatherExempt(member)) {
       return { ...member, activityWeather: weatherExemptResult(), weatherExempt: true, raw: {} }
     }
-    const manual = allEvents.filter((event) => Number(event.member_id) === Number(member.id) && !LATE_EVENT_TYPES.includes(event.event_type))
+    const manual = allEvents.filter((event) => Number(event.member_id) === Number(member.id) && !DERIVED_EVENT_TYPES.includes(event.event_type))
     const legacy = matchLegacyMember(member, legacyList)
     const recs = legacy ? allRecords.filter((r) => String(r.member_id) === String(legacy.id)) : []
+    const promos = legacy ? allPromo.filter((a) => String(a.member_id) === String(legacy.id)) : []
     const attendanceItems = attendanceItemsFromRecords(recs, sessionById)
+    const promoItems = promotionMissItems(promos, missionById, now)
     return {
       ...member,
-      activityWeather: calculateWeatherFromEvents([...manual, ...attendanceItems]),
-      raw: { scoreEvents: manual, attendanceItems },
+      activityWeather: calculateWeatherFromEvents([...manual, ...attendanceItems, ...promoItems]),
+      raw: { scoreEvents: manual, attendanceItems, promoItems },
     }
   })
 }

@@ -4971,3 +4971,6 @@ svg.login-v2-wave{bottom:-17px!important}
 
 /* 팀 관리: 동의한 팀원 전화번호(팀장 열람) */
 .member-manage-list .member-phone{display:inline-block;margin-top:2px;font-size:12px;font-weight:700;color:#1f9d57;text-decoration:none}
+
+/* 홈 구름낀해 아이콘 왼쪽 10·위 10 (61/45 → 51/35) */
+.mast-home-hero-weather .weather-partly_sunny.weather-size-hero{transform:translate(51px,35px) scale(1.2)!important;transform-origin:100% 100%!important}

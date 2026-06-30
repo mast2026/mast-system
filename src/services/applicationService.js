@@ -92,6 +92,14 @@ export async function decideApplication(applicationId, leaderId, decision, rejec
   const { data: accepted, error: acceptError } = await client.from(TABLES.applications).update({ status: 'accepted' }).eq('id', applicationId).eq('status', 'pending').select('id').maybeSingle()
   if (acceptError || !accepted) { await rollbackMembership(); await client.from(TABLES.teams).update({ current_members: team.current_members, status: team.status, closed_at: team.closed_at }).eq('id', team.id); if (acceptError) throw acceptError; throw new Error('다른 사용자가 먼저 처리한 지원서입니다.') }
   await notifyApplicationResult(client, application, team, 'accepted')
+  // 공모전 팀 합류 승인 → '공모전 참여 +1' 자동 부여 (같은 팀 중복 방지)
+  try {
+    const { data: existingScore } = await client.from(TABLES.scoreEvents).select('id,metadata').eq('member_id', application.applicant_id).eq('event_type', 'contest_join')
+    const already = (existingScore ?? []).some((e) => String(e.metadata?.team_id) === String(team.id))
+    if (!already) {
+      await client.from(TABLES.scoreEvents).insert({ member_id: application.applicant_id, event_type: 'contest_join', points: 1, verified: true, metadata: { reason: `${team.introduction || '공모전 팀'} 합류`, team_id: team.id } })
+    }
+  } catch { /* 점수 부여 실패는 승인 자체를 막지 않음 */ }
 }
 export async function getMyApplications(memberId) {
   const client = requireSupabase(); const [{ data: applications, error }, { data: teams, error: teamError }, { data: contests, error: contestError }] = await Promise.all([client.from(TABLES.applications).select('*').eq('applicant_id', memberId).order('id', { ascending: false }), client.from(TABLES.teams).select(TEAM_PUBLIC_FIELDS), client.from(TABLES.contests).select('*')]); throwIfError(error || teamError || contestError)

@@ -81,20 +81,16 @@ export const WEATHER_BASE_SCORE = 70
 
 // 관리자 화면에서 버튼으로 노출되는 가감점 프리셋.
 // key는 score_events.event_type 로 저장되고, points 는 부호 포함 점수입니다.
+// 수동 버튼으로만 부여하는 항목.
+// (오티 정참/지각/결석 → 출석 기록 자동, 공모전 참여 → 팀 합류 승인 자동,
+//  동료평가 1위 → 결과 반영 자동, 에타 미참여 → 미션 마감 후 자동 — 이들은 버튼에서 제외)
 export const SCORE_RUBRIC = [
   // 가산
-  { key: 'ot_present',         label: '오티 정참',                 points: 5,   group: 'gain' },
   { key: 'ot_jacket',          label: '오티 과잠바 착용',           points: 2,   group: 'gain' },
-  { key: 'contest_join',       label: '공모전 참여',               points: 1,   group: 'gain' },
-  { key: 'contest_peer',       label: '공모전 동료 평가',           points: 1,   group: 'gain' },
   { key: 'contest_submit',     label: '공모전 제출/미팅/피드백 참여', points: 5,   group: 'gain' },
   { key: 'contest_award',      label: '공모전 수상',               points: 20,  group: 'gain' },
   // 감점
-  { key: 'ot_late',            label: '오티 지각',                 points: -3,  group: 'deduct' },
-  { key: 'ot_late_30',         label: '오티 지각(30분 이내)',       points: -1,  group: 'deduct' },
-  { key: 'ot_absent',          label: '오티 결석',                 points: -10, group: 'deduct' },
   { key: 'ot_no_jacket',       label: '오티 과잠바 미착용',         points: -2,  group: 'deduct' },
-  { key: 'eta_miss',           label: '에타 1회 미참여',            points: -2,  group: 'deduct' },
   { key: 'contest_out',        label: '공모전 정정기간 외 아웃',     points: -10, group: 'deduct' },
   { key: 'contest_no_submit',  label: '공모전 제출/미팅/피드백 미참여', points: -5, group: 'deduct' },
 ]
