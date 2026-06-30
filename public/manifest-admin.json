@@ -1,0 +1,15 @@
+{
+  "name": "MAST 관리자",
+  "short_name": "MAST 관리자",
+  "description": "MAST 동아리 통합 시스템 — 관리자(운영진) 콘솔",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#10284f",
+  "icons": [
+    { "src": "/touch-icon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/touch-icon.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/touch-icon.png", "sizes": "any", "type": "image/png", "purpose": "any" }
+  ]
+}

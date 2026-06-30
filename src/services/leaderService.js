@@ -1,4 +1,5 @@
 import { TABLES, requireSupabase, throwIfError } from './baseService'
+import { notifyAdmins } from './notificationService'
 
 const CONTEST_MARKER = '[contest_id]'
 const TEAM_DRAFT_MARKER = '[team_post_draft]'
@@ -120,6 +121,8 @@ export async function applyForLeader(memberId, contestId, message) {
 
   const { data, error } = await requireSupabase().from(TABLES.leaderApplications).insert(payload).select('*').single()
   throwIfError(error)
+  // 공모전 팀장 신청 도착 → 관리자에게 알림
+  notifyAdmins({ title: '공모전 팀장 신청 도착', body: '새 공모전 팀장(팀 공고 작성) 신청이 들어왔어요.', href: '/admin/contest?tab=leader-applications' })
   return normalizeApplication(data)
 }
 

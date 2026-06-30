@@ -1,4 +1,5 @@
 import { TABLES, requireSupabase, throwIfError } from './baseService'
+import { notifyAdmins } from './notificationService'
 import { detectTeamCapabilities, TEAM_PUBLIC_FIELDS } from './teamService'
 import { ensureTeamsForAcceptedLeaderApplications, getMyLeaderApplications } from './leaderService'
 
@@ -64,7 +65,10 @@ export async function submitApplication(teamId, applicantId, values) {
     delete rest.phone_consent
     ;({ data, error } = await client.from(TABLES.applications).insert(rest).select('*').single())
   }
-  throwIfError(error); return data
+  throwIfError(error)
+  // 팀매칭 신청 도착 → 관리자에게 알림
+  notifyAdmins({ title: '새 팀매칭 신청 도착', body: `${team.introduction || '공모전 팀'}에 새 팀 지원이 들어왔어요.`, href: '/admin/applications' })
+  return data
 }
 export async function getLeaderApplicationsForTeam(teamId, leaderId) {
   const client = requireSupabase(); const { data: team, error: teamError } = await client.from(TABLES.teams).select('*').eq('id', teamId).eq('leader_id', leaderId).maybeSingle(); throwIfError(teamError); if (!team) throw new Error('이 팀의 지원자를 관리할 권한이 없습니다.')

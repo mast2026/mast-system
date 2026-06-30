@@ -28,6 +28,10 @@ export async function getAdminDashboardData() {
       attendanceUnchecked: Math.max(0, Number(attendance.members.length || 0) - Number(attendance.records.filter((row) => row.status === 'present').length || 0)),
       promotionPending: promotion.assignments.filter((item) => ['submitted', 'pending_review'].includes(String(item.status ?? ''))).length,
       promotionMissing: promotion.assignments.filter((item) => ['pending', 'missed', 'rejected'].includes(String(item.status ?? 'pending'))).length,
+      hasTodayPromotionMission: (() => {
+        const todayStr = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+        return (promotion.missions ?? []).some((m) => String(m.mission_date) === todayStr)
+      })(),
     },
     recentContests: sortDesc(contests).slice(0, 5),
     recentTeams: sortDesc(teams).slice(0, 5),

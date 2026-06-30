@@ -99,6 +99,18 @@ export async function sendOneSignalPush({ memberIds, all, title, body, url } = {
   } catch { /* 발송 함수 미배포/오류여도 무시 */ }
 }
 
+// 관리자(운영진/지도교수)에게만 알림 + 푸시 (예: 팀장/팀매칭 신청 도착)
+export async function notifyAdmins({ title, body, href } = {}) {
+  try {
+    const client = requireSupabase()
+    const { data: admins } = await client.from(TABLES.members).select('id,role').in('role', ['admin', 'manager', 'professor'])
+    const ids = (admins ?? []).map((a) => a.id)
+    if (!ids.length) return
+    await client.from(TABLES.notifications).insert(ids.map((id) => ({ member_id: id, type: 'notice', title, body, href })))
+    await sendOneSignalPush({ memberIds: ids, title, body, url: href })
+  } catch { /* 무시 */ }
+}
+
 export async function notifyAttendanceOpen(session) {
   const client = requireSupabase()
   const title = session?.title || '모임'

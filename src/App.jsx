@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import AppErrorBoundary from './components/AppErrorBoundary'
 import AppLayout from './components/AppLayout'
@@ -71,8 +72,21 @@ function HomeEntry() {
   return canAccessAdmin ? <Navigate to="/admin" replace /> : <HomeScreen />
 }
 
+// 관리자(/admin) 화면에선 관리자용 매니페스트로 바꿔, 홈 화면 추가 시 별도 앱으로 설치되게 함
+function ManifestSwitcher() {
+  const location = useLocation()
+  useEffect(() => {
+    const isAdmin = location.pathname.startsWith('/admin')
+    const link = document.getElementById('app-manifest')
+    if (link) link.setAttribute('href', isAdmin ? '/manifest-admin.json' : '/manifest.json')
+    const titleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]')
+    if (titleMeta) titleMeta.setAttribute('content', isAdmin ? 'MAST 관리자' : 'MAST')
+  }, [location.pathname])
+  return null
+}
+
 function AppRoutes() {
-  return <Routes>
+  return <><ManifestSwitcher /><Routes>
     <Route path="/login" element={<LoginEntry />} />
     <Route path="/admin-login" element={<AdminLoginEntry />} />
 
@@ -126,7 +140,7 @@ function AppRoutes() {
     </Route>
 
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>
+  </Routes></>
 }
 
 export default function App() {
