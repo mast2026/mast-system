@@ -73,6 +73,8 @@ export default function TeamManagementScreen() {
 
   const { team, applications } = q.data
   const members = team.teamMemberships.filter((item) => item.member_id !== team.leader_id)
+  // 전화번호 공개에 동의한 지원서 → 회원별 전화번호 (팀장만 열람)
+  const phoneByMemberId = new Map((applications ?? []).filter((a) => a.phone_consent && a.phone).map((a) => [Number(a.applicant_id), a.phone]))
   const chatValue = chat === null ? (team.open_chat_url || '') : chat
   const correctionEnd = team.closed_at ? getCorrectionEnd(team.closed_at) : null
 
@@ -139,7 +141,7 @@ export default function TeamManagementScreen() {
       {!members.length ? <EmptyState title="아직 합류한 팀원이 없어요" /> : <div className="member-manage-list">
         {members.map((link) => <div key={link.id}>
           <div className="member-avatar"><UsersRound /></div>
-          <div><b>{link.member.name}</b><small>활동 중</small></div>
+          <div><b>{link.member.name}</b><small>{[link.member.school, link.member.major].filter(Boolean).join(' · ') || '활동 중'}</small>{phoneByMemberId.get(Number(link.member_id ?? link.member?.id)) && <a className="member-phone" href={`tel:${phoneByMemberId.get(Number(link.member_id ?? link.member?.id))}`}>📞 {phoneByMemberId.get(Number(link.member_id ?? link.member?.id))}</a>}</div>
           <button className="button danger" disabled={busy || !team.capabilities.membershipOperations} onClick={() => setRemoving(link)}><UserMinus />제외</button>
         </div>)}
       </div>}
@@ -150,7 +152,7 @@ export default function TeamManagementScreen() {
       {!applications.length ? <EmptyState title="아직 도착한 지원서가 없어요" /> : <div className="applicant-list">
         {applications.map((application) => <article key={application.id}>
           <div className="card-heading">
-            <div><h3>{application.applicant?.name || '지원자'}</h3><small>{application.survey_role || tagsToText(application.skill_tags) || '역량 해시태그 미입력'}</small></div>
+            <div><h3>{application.applicant?.name || '지원자'}</h3><small className="applicant-school">{[application.applicant?.school, application.applicant?.major].filter(Boolean).join(' · ') || '학교·학과 미입력'}</small><small>{application.survey_role || tagsToText(application.skill_tags) || '역량 해시태그 미입력'}</small></div>
             <Badge value={application.status} />
           </div>
           <p>{application.capability_appeal || application.survey_purpose || '역량 어필이 비어 있습니다.'}</p>

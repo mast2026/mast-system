@@ -1,4 +1,6 @@
 import { getAllActivityWeather } from './activityWeatherService'
+import { classifyAttendance } from './attendanceService'
+import { sendOneSignalPush } from './notificationService'
 import { TABLES, requireSupabase, throwIfError } from './baseService'
 import { getMembers } from './memberService'
 import { deleteTeamPost, TEAM_PUBLIC_FIELDS } from './teamService'
@@ -415,6 +417,7 @@ export async function createAnnouncement(values) {
         body: values.content,
         href: '/announcements',
       }))
+      await sendOneSignalPush({ all: true, title: values.title, body: values.content, url: '/announcements' })
     } catch (error) {
       return { ...announcement, notificationWarning: error.message }
     }
@@ -590,6 +593,28 @@ export async function applyPeerReviewAwards() {
   return { winners, teams: byTeam.size }
 }
 
+// 모임의 출석 기준 시각이 바뀌면, 이미 '출석/지각'인 회원들을 각자 체크 시각 기준으로 다시 분류합니다.
+// (결석·면제 등 관리자가 지정한 상태는 건드리지 않음)
+export async function recomputeSessionLateness(sessionId) {
+  const client = requireSupabase()
+  const { data: session } = await client.from('activity_sessions').select('*').eq('id', sessionId).maybeSingle()
+  if (!session) return { updated: 0 }
+  const { data: records } = await client.from('activity_attendance_records').select('*').eq('session_id', sessionId)
+  let updated = 0
+  for (const r of records ?? []) {
+    if (!['present', 'late'].includes(String(r.status))) continue
+    if (!r.checked_at) continue
+    const tier = classifyAttendance(session, new Date(r.checked_at).getTime())
+    const newStatus = tier.status
+    const newPoints = tier.status === 'present' ? Number(session.base_points ?? 1) : tier.points
+    if (String(r.status) !== newStatus || Number(r.points) !== newPoints) {
+      await updateRow('activity_attendance_records', r.id, { status: newStatus, points: newPoints })
+      updated += 1
+    }
+  }
+  return { updated }
+}
+
 export async function createAttendanceSession(values) {
   return insertRow('activity_sessions', clean({
     title: values.title,
@@ -644,13 +669,16 @@ export async function setAttendanceRecordStatus({ sessionId, memberId, status, p
     .eq('member_id', memberId)
     .maybeSingle()
   throwIfError(findError)
+  // 출석=기본점, 지각=-3(관리자 수동), 그 외=0
+  const recordPoints = status === 'present' ? Number(points || 1) : (status === 'late' ? -3 : 0)
   const payload = clean({
     session_id: sessionId,
     member_id: memberId,
     status,
     checked_at: new Date().toISOString(),
-    points: status === 'present' ? Number(points || 1) : 0,
+    points: recordPoints,
   })
+  // 지각 감점은 출석 기록에서 활동날씨 계산 시 실시간 반영됩니다(별도 점수 이벤트 동기화 불필요).
   if (existing?.id) return updateRow('activity_attendance_records', existing.id, payload)
   return insertRow('activity_attendance_records', payload)
 }

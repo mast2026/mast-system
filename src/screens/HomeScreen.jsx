@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Bell, CalendarDays, ChevronRight, CloudSun, FileText, Megaphone, Trophy, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -23,6 +24,19 @@ export default function HomeScreen() {
     initialData: [],
   })
   const weatherQuery = useQuery(() => getMemberActivityWeather(member), [member.id])
+
+  // 관리자가 점수·출석·공지 등을 수정하면 앱 복귀/탭 전환 시 자동으로 다시 불러와 반영
+  const refreshRef = useRef(() => {})
+  refreshRef.current = () => { retry && retry(); weatherQuery.retry && weatherQuery.retry(); attendanceQuery.retry && attendanceQuery.retry(); promotionQuery.retry && promotionQuery.retry() }
+  useEffect(() => {
+    const refresh = () => { if (!document.hidden) refreshRef.current() }
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [])
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState error={error} retry={retry} />

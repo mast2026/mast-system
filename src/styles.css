@@ -4942,3 +4942,32 @@ svg.login-v2-wave{bottom:-17px!important}
 .score-guide-col.deduct li em{color:#e0564f}
 .score-guide-note{margin:10px 2px 0;font-size:11.5px;color:#8a97a6}
 @media(max-width:480px){.score-guide-cols{grid-template-columns:1fr}}
+
+/* 매칭: 지원자 학교·학과 라벨 */
+.applicant-list .card-heading small.applicant-school{display:block;color:#3977ff;font-weight:700;margin-bottom:2px}
+
+/* 팀 공고: 팀장 학교·학과 */
+.team-card .card-heading .team-leader-info{display:block;margin-top:2px;color:#3977ff;font-weight:700;font-size:12px}
+
+/* 관리자 출석 현황: 일괄 처리 바 + 체크박스 행 */
+.attendance-bulk-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#f7faff;border:1px solid #e6eef9;border-radius:14px;padding:10px 14px;margin-bottom:12px}
+.attendance-selectall{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#2a3550;cursor:pointer}
+.attendance-bulk-bar>span{font-size:13px;color:#46506a}
+.attendance-bulk-bar>span b{color:#0b59d0}
+.attendance-bulk-actions{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.attendance-bulk-actions button{border:1px solid #d8e2f0;background:#fff;border-radius:10px;padding:7px 12px;font-size:13px;font-weight:700;color:#2a3550;cursor:pointer}
+.attendance-bulk-actions button:disabled{opacity:.45;cursor:default}
+.attendance-roster-row.has-check{display:flex;align-items:center;gap:10px}
+.attendance-roster-row.has-check>div:nth-of-type(1){flex:1;min-width:0}
+.attendance-row-check{width:18px;height:18px;flex-shrink:0;cursor:pointer}
+
+/* 출석 현황: 컬럼별 전체 선택 */
+.attendance-roster-column h3{display:flex;align-items:center;gap:8px}
+.attendance-col-selectall{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#3977ff;cursor:pointer;white-space:nowrap}
+.attendance-col-selectall input{width:16px;height:16px}
+
+/* 출석코드 탭: 모임 선택 드롭다운 */
+.attendance-code-current .attendance-code-select{margin:4px 0 2px;max-width:100%;padding:8px 10px;border:1px solid #dde5f0;border-radius:10px;font-size:14px;font-weight:700;color:#1b2a4a;background:#fff}
+
+/* 팀 관리: 동의한 팀원 전화번호(팀장 열람) */
+.member-manage-list .member-phone{display:inline-block;margin-top:2px;font-size:12px;font-weight:700;color:#1f9d57;text-decoration:none}

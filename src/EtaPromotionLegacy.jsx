@@ -598,9 +598,14 @@ function MemberHome(props) {
       {loading ? (
         <div style={homeCard({ textAlign: "center", color: SUB })}>불러오는 중...</div>
       ) : !mission ? (
-        <div style={homeCard({ textAlign: "center", padding: 32 })}>
-          <div style={{ marginBottom: 12, display: "flex", justifyContent: "center" }}><IconInbox /></div>
-          <div style={{ fontSize: 14, color: SUB, fontWeight: 600 }}>오늘 등록된 홍보 미션이 없습니다.</div>
+        <div style={homeHeroCard({ height: 258, overflow: "visible", background: "transparent" })}>
+          <div style={{ position: "absolute", zIndex: 0, inset: "-80px -36px -58px -36px", background: "radial-gradient(circle at 72% 34%, rgba(190,225,255,.64), transparent 38%), radial-gradient(circle at 18% 24%, rgba(255,235,160,.24), transparent 34%)", pointerEvents: "none" }} />
+          <img src={assets.hero.megaphone} alt="" style={{ position: "absolute", zIndex: 1, left: -18, bottom: -6, width: 188, height: "auto", objectFit: "contain", opacity: 0.8, pointerEvents: "none", filter: "drop-shadow(0 18px 30px rgba(58,105,220,0.14))" }} />
+          <div style={{ position: "relative", zIndex: 3, paddingTop: 12, textAlign: "center" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", maxWidth: "calc(100vw - 42px)", minHeight: 30, padding: "0 12px", borderRadius: 16, background: "#F1FFF8", color: "#00A879", fontSize: 13, lineHeight: "20px", fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>오늘 홍보 미션 · {fmtShortDate(today)}</div>
+            <div style={{ marginTop: 9, padding: "0 14px", fontSize: 18, lineHeight: "23px", color: "#071C59", fontWeight: 900, letterSpacing: "-0.03em", wordBreak: "keep-all" }}>오늘 등록된 미션이 없어요</div>
+            <div style={{ marginTop: 8, fontSize: 18, lineHeight: "26px", fontWeight: 900, color: "#2F78F6", letterSpacing: "-0.04em", wordBreak: "keep-all" }}>새 홍보 미션이 올라오면 알려드릴게요</div>
+          </div>
         </div>
       ) : (
         <div style={homeHeroCard({ height: 258, overflow: "visible", background: "transparent" })}>
@@ -749,6 +754,7 @@ function MemberCert(props) {
   var _loading = useState(true), loading = _loading[0], setLoading = _loading[1];
   var _done = useState(false), done = _done[0], setDone = _done[1];
   var _copyMsg = useState(""), copyMsg = _copyMsg[0], setCopyMsg = _copyMsg[1];
+  var _expand = useState(false), expand = _expand[0], setExpand = _expand[1];
 
   var load = useCallback(async function() {
     setLoading(true);
@@ -828,11 +834,22 @@ function MemberCert(props) {
     <div style={{ padding: "0 16px" }}>
       <PageHeader title="인증하기" />
 
+      <div style={card({ marginBottom: 16, border: "1px solid #BBD6FF", background: "linear-gradient(135deg,#EFF5FF,#F3F8FF)" })}>
+        <div style={{ fontSize: 13.5, fontWeight: 900, color: "#0860EC", marginBottom: 7 }}>📢 에브리타임 홍보 관련 안내</div>
+        <div style={{ fontSize: 12.5, lineHeight: "19px", color: "#42506A", fontWeight: 700, wordBreak: "keep-all" }}>
+          각 학교 에브리타임 게시판 기준으로, 우리 동아리 게시글이 <b style={{ color: "#0860EC" }}>최신 상단 5개 안</b>에 포함되어 있으면 추가 업로드를 하지 않으셔도 됩니다.<br />
+          캡처본 업로드 시 <b style={{ color: "#0860EC" }}>해당 게시판의 최신 글 목록이 보이도록</b> 캡처해 보내주시면 홍보를 진행한 것으로 인정하여 카운팅합니다. 감사합니다!
+        </div>
+      </div>
+
       <div style={card({ marginBottom: 16, border: "1px solid #E5EAF2", background: "#fff" })}>
         <div style={{ fontSize: 11, fontWeight: 900, color: "#66728A", marginBottom: 6 }}>오늘 미션</div>
         <div style={{ fontSize: fitFontSize(mission.title, 17, 13, 18, 7), lineHeight: "24px", fontWeight: 900, color: INK, marginBottom: mission.body ? 8 : 0, wordBreak: "keep-all" }}>{mission.title}</div>
         {mission.body && (
-          <div style={{ fontSize: 13, lineHeight: 1.65, color: "#42506A", fontWeight: 700, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{mission.body}</div>
+          <div>
+            <div style={Object.assign({ fontSize: 13, lineHeight: 1.65, color: "#42506A", fontWeight: 700, whiteSpace: "pre-wrap", wordBreak: "break-word" }, expand ? {} : { display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" })}>{mission.body}</div>
+            <button onClick={function() { setExpand(!expand); }} style={{ marginTop: 6, border: "none", background: "none", color: BLUE, fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: FONT, padding: 0 }}>{expand ? "접기 ▲" : "자세히보기 ▼"}</button>
+          </div>
         )}
       </div>
 
@@ -972,6 +989,7 @@ function UploadForm(props) {
         </div>
       )}
 
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: "#0860EC", background: "#EAF2FF", borderRadius: 12, padding: "10px 12px", marginBottom: 12, lineHeight: "18px", wordBreak: "keep-all", textAlign: "center" }}>우리 동아리 게시글이 게시판 최신 상단 5개 안에 있으면 도배 방지를 위해 추가 업로드 없이 건너뛰기 해주세요. 캡처는 최신 글 목록이 보이도록 올려주세요.</div>
       {(preview || existingImg) ? (
         <div style={{ position: "relative", marginBottom: 12 }}>
           <img src={preview || existingImg} alt="미리보기" style={{ width: "100%", maxHeight: 300, objectFit: "contain", borderRadius: 14, border: "1px solid #E5EAF2" }} />
@@ -996,7 +1014,6 @@ function UploadForm(props) {
         <span style={{ width: 18, height: 18, borderRadius: 5, border: skipped ? "none" : "1.5px solid #C2CCDC", background: skipped ? "#0869F4" : "#fff", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, lineHeight: 0 }}>{skipped ? "✓" : ""}</span>
         건너뛰기 (이미 관련 게시물이 있어요)
       </button>
-      <div style={{ fontSize: 11, color: "#A8B2C5", marginBottom: 10, textAlign: "center", lineHeight: "16px" }}>같은 내용이 이미 게시판에 있어 새 글을 올리지 않은 경우 표시해주세요. 인증 사진은 그대로 업로드해주세요.</div>
       <button style={btnPrimary({ opacity: busy ? 0.7 : 1 })} disabled={busy} onClick={submit}>
         {busy ? "업로드 중..." : existingProof ? "사진 수정 완료" : "인증 제출"}
       </button>
@@ -2591,10 +2608,17 @@ function MemberDetailModal(props) {
   useEffect(function() { load(); }, [load]);
 
   async function deleteRecord(row) {
-    if (!confirm(row.mission_date + " 기록을 삭제하시겠습니까?")) return;
-    var reason = promptRequiredReason("기록 초기화 사유를 입력해 주세요.", "관리자 초기화");
-    if (!reason) return;
-    await supabase.from("promotion_mission_assignments").update({ status: ST.PENDING, submitted_at: null, reviewed_at: new Date().toISOString(), status_reason: reason }).eq("id", row.id);
+    if (!confirm(row.mission_date + " 기록을 완전히 삭제하시겠습니까?\n해당 회원의 인증 사진과 배정 이력이 함께 삭제됩니다.")) return;
+    // 인증 사진 삭제 (스토리지 + proofs 행)
+    var pr = await supabase.from("promotion_proofs").select("id,proof_file_path").eq("assignment_id", row.id);
+    var proofs = pr.data || [];
+    var paths = proofs.map(function(p) { return p.proof_file_path; }).filter(Boolean);
+    if (paths.length) await supabase.storage.from(PROOF_BUCKET).remove(paths);
+    if (proofs.length) await supabase.from("promotion_proofs").delete().eq("assignment_id", row.id);
+    // 배정 이력 자체 삭제
+    var del = await supabase.from("promotion_mission_assignments").delete().eq("id", row.id).select("id");
+    if (del.error) { alert("삭제 실패: " + del.error.message); return; }
+    if (!del.data || del.data.length === 0) { alert("DB에서 삭제되지 않았습니다(권한). Supabase에서 prototype-write-access.sql 실행을 확인해주세요."); return; }
     await load();
     if (props.onChanged) props.onChanged();
   }

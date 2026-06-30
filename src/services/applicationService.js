@@ -54,7 +54,17 @@ export async function submitApplication(teamId, applicantId, values) {
   if (capabilities.leaderPriority && values.leader_priority !== undefined && values.leader_priority !== null && String(values.leader_priority).trim() !== '') {
     payload.leader_priority = values.leader_priority
   }
-  const { data, error } = await client.from(TABLES.applications).insert(payload).select('*').single(); throwIfError(error); return data
+  // 전화번호 + 공개 동의 (동의한 팀의 팀장만 열람). 컬럼 미생성 시 전화번호 없이 재시도.
+  payload.phone = values.phone ? String(values.phone).trim() : null
+  payload.phone_consent = Boolean(values.phone_consent)
+  let { data, error } = await client.from(TABLES.applications).insert(payload).select('*').single()
+  if (error && /phone/i.test(error.message || '')) {
+    const rest = { ...payload }
+    delete rest.phone
+    delete rest.phone_consent
+    ;({ data, error } = await client.from(TABLES.applications).insert(rest).select('*').single())
+  }
+  throwIfError(error); return data
 }
 export async function getLeaderApplicationsForTeam(teamId, leaderId) {
   const client = requireSupabase(); const { data: team, error: teamError } = await client.from(TABLES.teams).select('*').eq('id', teamId).eq('leader_id', leaderId).maybeSingle(); throwIfError(teamError); if (!team) throw new Error('이 팀의 지원자를 관리할 권한이 없습니다.')

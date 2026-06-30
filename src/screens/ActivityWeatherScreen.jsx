@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ActivityWeatherIcon from '../components/ActivityWeatherIcon'
 import { ErrorState, LoadingState } from '../components/States'
@@ -13,6 +14,18 @@ export default function ActivityWeatherScreen() {
   const { member } = useAuth()
   const [searchParams] = useSearchParams()
   const q = useQuery(() => getMemberActivityWeather(member), [member.id])
+  // 관리자가 점수·출석 등 날씨 관련 데이터를 수정하면, 앱 복귀/탭 전환 시 자동으로 다시 불러와 반영
+  const retryRef = useRef(q.retry)
+  retryRef.current = q.retry
+  useEffect(() => {
+    const refresh = () => { if (!document.hidden) retryRef.current && retryRef.current() }
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [])
   const previewType = searchParams.get('preview')
   const rawPreviewScore = searchParams.get('previewScore')
   const previewScore = rawPreviewScore === null ? null : Number(rawPreviewScore)

@@ -89,6 +89,16 @@ export function startNotificationWatcher(memberId, { intervalMs = 45000, onNew }
 // ---------------------------------------------------------------------------
 
 // 출석 모임이 시작되어 출석 체크가 필요할 때: 전체 회원에게 알림
+// OneSignal Edge Function 호출 → 앱을 닫아도 오는 푸시 발송. 실패해도 알림 생성은 막지 않음.
+// Supabase Edge Function 슬러그 (대시보드에서 만든 함수 이름)
+const PUSH_FUNCTION = 'smooth-service'
+export async function sendOneSignalPush({ memberIds, all, title, body, url } = {}) {
+  try {
+    const client = requireSupabase()
+    await client.functions.invoke(PUSH_FUNCTION, { body: { memberIds, all, title, body, url } })
+  } catch { /* 발송 함수 미배포/오류여도 무시 */ }
+}
+
 export async function notifyAttendanceOpen(session) {
   const client = requireSupabase()
   const title = session?.title || '모임'
@@ -100,6 +110,7 @@ export async function notifyAttendanceOpen(session) {
     href: '/attendance',
   })
   throwIfError(error)
+  await sendOneSignalPush({ all: true, title: '출석체크가 시작되었습니다', body: `${title} 출석을 진행해 주세요.`, url: '/attendance' })
   return true
 }
 
@@ -179,6 +190,12 @@ export async function notifyPromotionTargets({ mission, assignees } = {}) {
   if (rows.length) {
     const { error: insertError } = await client.from(TABLES.notifications).insert(rows)
     throwIfError(insertError)
+    await sendOneSignalPush({
+      memberIds: rows.map((r) => r.member_id),
+      title: '홍보 인증 미제출 안내',
+      body: `${missionTitle} — 아직 인증을 제출하지 않았어요. 오늘 안에 인증해 주세요.`,
+      url: '/promotion',
+    })
   }
   return { sent: rows.length, unmatched }
 }

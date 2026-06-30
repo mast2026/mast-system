@@ -127,19 +127,68 @@ export async function submitAttendance({ currentMember, sessionId, code }) {
     .single()
   throwIfError(error)
 
-  // 지각이면 활동날씨 점수에 자동 반영 (30분 이내 -1 / 초과 -3)
-  if (tier.status === 'late' && currentMember?.id != null) {
-    try {
-      await client.from(TABLES.scoreEvents).insert({
-        member_id: Number(currentMember.id),
-        event_type: tier.points <= -3 ? 'ot_late' : 'ot_late_30',
-        points: tier.points,
-        verified: true,
-        metadata: { reason: `${session.title || '모임'} 지각 · ${tier.label}` },
-      })
-    } catch { /* 점수 자동배정 실패는 출석 자체를 막지 않음 */ }
-  }
+  // 지각 감점은 출석 기록에서 활동날씨 계산 시 실시간으로 반영됩니다(별도 점수 이벤트 저장 안 함).
   return { ...data, lateInfo: tier }
+}
+
+// team_matching 회원 id 기준으로 해당 모임의 '지각' 점수 이벤트를 동기화합니다.
+// status가 'late'면 1건 보장(중복 제거 후 재생성), 아니면 모두 제거합니다.
+export async function writeAttendanceLateScore(tmMemberId, session, status, points) {
+  if (tmMemberId == null || !session) return
+  const client = requireSupabase()
+  const title = String(session.title || '')
+  const { data: events } = await client
+    .from(TABLES.scoreEvents).select('id,event_type,metadata')
+    .eq('member_id', tmMemberId)
+    .in('event_type', ['attendance_late', 'ot_late', 'ot_late_30'])
+  const delIds = (events ?? []).filter((e) => {
+    if (String(e.metadata?.session_id) === String(session.id)) return true
+    // 구버전 이벤트(세션 id 없음)는 사유에 모임명이 들어간 경우 매칭
+    if (['ot_late', 'ot_late_30'].includes(e.event_type) && title && String(e.metadata?.reason || '').includes(title)) return true
+    return false
+  }).map((e) => e.id)
+  if (delIds.length) await client.from(TABLES.scoreEvents).delete().in('id', delIds)
+  if (status === 'late') {
+    const pts = Number(points) <= -3 ? -3 : -1
+    await client.from(TABLES.scoreEvents).insert({
+      member_id: tmMemberId,
+      event_type: 'attendance_late',
+      points: pts,
+      verified: true,
+      metadata: { reason: `${title || '모임'} 지각`, session_id: session.id },
+    })
+  }
+}
+
+// 출석용 레거시 members.id → 활동날씨(team_matching) 회원 id 매핑
+export async function resolveWeatherMemberId(legacyMemberId) {
+  const client = requireSupabase()
+  const [{ data: tmList }, { data: legacy }] = await Promise.all([
+    client.from(TABLES.members).select('*'),
+    client.from(LEGACY_MEMBERS_TABLE).select('*').eq('id', legacyMemberId).maybeSingle(),
+  ])
+  const list = tmList ?? []
+  // 1) mast_member_id 직접 매칭
+  let found = list.find((m) => m.mast_member_id != null && String(m.mast_member_id) === String(legacyMemberId))
+  if (found) return found.id
+  // 2) 이름/학교/기수 매칭
+  if (legacy) {
+    const n = normalize(legacy.name)
+    const s = normalize(legacy.school)
+    const g = generationNumber(legacy.gi ?? legacy.generation)
+    found = list.find((m) => normalize(m.name) === n && (!s || normalize(m.school) === s) && (!g || generationNumber(m.generation) === g))
+    if (found) return found.id
+    const byName = list.filter((m) => normalize(m.name) === n)
+    if (byName.length === 1) return byName[0].id
+  }
+  return null
+}
+
+// 레거시 회원 id로 지각 점수 동기화
+export async function syncAttendanceLateForLegacy(legacyMemberId, session, status, points) {
+  const tmId = await resolveWeatherMemberId(legacyMemberId)
+  if (tmId == null) return
+  await writeAttendanceLateScore(tmId, session, status, points)
 }
 
 // 출석 시각을 정시 기준과 비교해 present / 지각(30분 이내, -1) / 지각(30분 초과, -3) 으로 분류

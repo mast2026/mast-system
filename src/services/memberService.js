@@ -79,25 +79,26 @@ export async function loginFirstTime(name, school, generation, newPassword, conf
   if (roles?.length) candidates = candidates.filter((m) => roles.includes(m.role))
   if (!candidates.length) throw new Error('일치하는 회원이 없습니다.')
 
-  // DB에 학교/기수가 있으면 일치 검사, 비어 있으면 입력값 인정. 동명이인은 학교/기수로 구분.
-  const inSchool = normalizeStr(school)
-  const inGen = extractNum(generation)
-  const matchesIdentity = (m) => {
-    const dbSchool = normalizeStr(m.school)
-    const dbGen = extractNum(m.generation)
-    return (!dbSchool || dbSchool === inSchool) && (dbGen === '' || (inGen !== '' && dbGen === inGen))
-  }
+  // 비밀번호가 아직 없는 후보만 추림
+  const passwordStates = await Promise.all(candidates.map((m) => checkHasPassword(m.id)))
+  const passwordless = candidates.filter((_, i) => !passwordStates[i])
+  if (!passwordless.length) throw new Error('이미 비밀번호가 설정된 계정입니다. 이름과 비밀번호로 로그인하세요.')
 
-  // 비밀번호 미설정 + 학교/기수 일치 후보 선택
-  let member = null
-  for (const m of candidates) {
-    if (await checkHasPassword(m.id)) continue
-    if (matchesIdentity(m)) { member = m; break }
-  }
-  if (!member) {
-    const passwordStates = await Promise.all(candidates.map((m) => checkHasPassword(m.id)))
-    if (passwordStates.every(Boolean)) throw new Error('이미 비밀번호가 설정된 계정입니다. 이름과 비밀번호로 로그인하세요.')
-    throw new Error('학교 또는 기수 정보가 일치하지 않습니다.')
+  let member
+  if (passwordless.length === 1) {
+    // 동명이인이 아니면 이름으로 특정되므로 학교 정확 일치를 요구하지 않음
+    member = passwordless[0]
+  } else {
+    // 동명이인: 학교/기수로 구분 (로그인 화면 드롭다운이 DB값을 그대로 채워줌)
+    const inSchool = normalizeStr(school)
+    const inGen = extractNum(generation)
+    const matches = passwordless.filter((m) => {
+      const dbSchool = normalizeStr(m.school)
+      const dbGen = extractNum(m.generation)
+      return (!dbSchool || dbSchool === inSchool) && (dbGen === '' || (inGen !== '' && dbGen === inGen))
+    })
+    if (matches.length !== 1) throw new Error('동명이인입니다. 본인 학교·기수를 정확히 선택해 주세요.')
+    member = matches[0]
   }
 
   if (!newPassword || newPassword.length < 4) throw new Error('비밀번호는 4자 이상 입력하세요.')

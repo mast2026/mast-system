@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarDays, CheckCircle2, ChevronRight, ClipboardCheck, LockKeyhole, UsersRound } from 'lucide-react'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
@@ -22,6 +22,19 @@ export default function AttendanceScreen() {
   useEffect(() => {
     if (!isAdmin && tab === 'admin') setTab('home')
   }, [isAdmin, tab])
+
+  // 앱으로 돌아오거나 탭 전환 시 출석 정보를 다시 불러와 최신 상태(관리자 처리·모임 수정 등)를 반영
+  const retryRef = useRef(query.retry)
+  retryRef.current = query.retry
+  useEffect(() => {
+    const refresh = () => { if (!document.hidden) retryRef.current && retryRef.current() }
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [])
 
   if (query.loading) return <LoadingState label="출석 시스템을 불러오는 중..." />
   if (query.error) return <ErrorState error={query.error} retry={query.retry} />

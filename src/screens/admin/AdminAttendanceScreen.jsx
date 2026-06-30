@@ -13,6 +13,7 @@ import {
   createAttendanceSession,
   deleteAttendanceSession,
   getAdminAttendanceOverview,
+  recomputeSessionLateness,
   setAttendanceRecordStatus,
   updateAttendanceSession,
 } from '../../services/adminService'
@@ -69,13 +70,19 @@ export default function AdminAttendanceScreen() {
     setNotice('')
     try {
       const wasOpen = String(editing.status) === 'open'
-      await updateAttendanceSession(editing.id, values)
+      const sessionId = editing.id
+      await updateAttendanceSession(sessionId, values)
       setEditing(null)
       let extra = ''
       if (values.status === 'open' && !wasOpen) {
         try { await notifyAttendanceOpen({ title: values.title }); extra = ' 전체 회원에게 출석 알림을 보냈어요.' }
         catch { extra = ' (출석 알림 발송은 실패했어요.)' }
       }
+      // 기준 시각 변경 시 이미 체크된 출석자들의 지각/출석을 재계산
+      try {
+        const { updated } = await recomputeSessionLateness(sessionId)
+        if (updated > 0) extra += ` 기존 출석 ${updated}명의 지각 여부를 다시 계산했어요.`
+      } catch { /* 재계산 실패는 수정 자체를 막지 않음 */ }
       setNotice(`모임 일정을 수정했습니다.${extra}`)
       q.retry()
     } catch (error) {
@@ -150,6 +157,23 @@ export default function AdminAttendanceScreen() {
     }
   }
 
+  const markAttendanceBulk = async (memberIds, status) => {
+    if (!activeSession?.id || !memberIds.length) return
+    setBusy(true)
+    setNotice('')
+    try {
+      for (const id of memberIds) {
+        await setAttendanceRecordStatus({ sessionId: activeSession.id, memberId: id, status, points: activeSession.base_points ?? 1 })
+      }
+      setNotice(`${memberIds.length}명을 ${attendanceStatusLabel(status)} 처리했습니다.`)
+      q.retry()
+    } catch (error) {
+      setNotice(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (q.loading) return <LoadingState label="출석 관리자 데이터를 불러오는 중" />
   if (q.error) return <ErrorState error={q.error} retry={q.retry} />
 
@@ -188,8 +212,10 @@ export default function AdminAttendanceScreen() {
     {tab === 'code' && <>
       <section className="attendance-code-current">
         <div>
-          <span>현재 선택 모임</span>
-          <h2>{codeSession?.title || '등록된 모임 없음'}</h2>
+          <span>모임 선택</span>
+          {sessions.length ? <select className="attendance-code-select" value={(codeEditing?.id ?? selectedSessionId) || activeSession?.id || ''} onChange={(event) => { setSelectedSessionId(event.target.value); setCodeEditing(null) }}>
+            {sessions.map((session) => <option value={session.id} key={session.id}>{session.title || '모임'} · {formatSessionDate(session)}</option>)}
+          </select> : <h2>등록된 모임 없음</h2>}
           <p>{formatSessionDate(codeSession)} · {codeSession?.location || '장소 미정'}</p>
         </div>
         <div className="attendance-code-box">
@@ -218,6 +244,7 @@ export default function AdminAttendanceScreen() {
       selectedSessionId={selectedSessionId}
       onSelectSession={setSelectedSessionId}
       onMark={markAttendance}
+      onBulkMark={markAttendanceBulk}
       busy={busy}
     />}
 
@@ -249,40 +276,60 @@ function AttendanceListBlock({ title, sessions, empty, onEdit, onDelete }) {
   </section>
 }
 
-function AttendanceRecordsPanel({ sessions, records, members, activeSession, selectedSessionId, onSelectSession, onMark, busy }) {
+function AttendanceRecordsPanel({ sessions, records, members, activeSession, selectedSessionId, onSelectSession, onMark, onBulkMark, busy }) {
   const selectedId = selectedSessionId || activeSession?.id || ''
+  const [picked, setPicked] = useState(() => new Set())
   const sessionRecords = records.filter((record) => String(record.session_id) === String(selectedId))
   const recordMap = new Map(sessionRecords.map((record) => [String(record.member_id), record]))
   const presentMembers = members.filter((member) => ['present', 'late', 'excused'].includes(recordMap.get(String(member.id))?.status))
   const absentMembers = members.filter((member) => !['present', 'late', 'excused'].includes(recordMap.get(String(member.id))?.status))
 
+  const toggle = (id) => setPicked((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const setMany = (ids, select) => setPicked((prev) => { const n = new Set(prev); ids.forEach((id) => (select ? n.add(id) : n.delete(id))); return n })
+  const bulk = async (status) => { await onBulkMark([...picked], status); setPicked(new Set()) }
+
   return <section className="attendance-record-panel">
     <div className="mast-section-heading">
       <div>
         <h2>출석 현황</h2>
-        <p>모임을 선택한 뒤 회원별 출석/결석을 처리합니다.</p>
+        <p>회원을 선택해 개별·일괄로 출석 상태를 처리합니다.</p>
       </div>
       <select value={selectedId} onChange={(event) => onSelectSession(event.target.value)}>
         {sessions.map((session) => <option value={session.id} key={session.id}>{session.title || '모임'} · {formatSessionDate(session)}</option>)}
       </select>
     </div>
-    {!sessions.length ? <EmptyState title="모임이 없습니다" description="일정을 먼저 등록해 주세요." /> : (
-      <div className="attendance-roster-grid">
-        <RosterColumn title={`출석한 회원 ${presentMembers.length}명`} members={presentMembers} recordMap={recordMap} onMark={onMark} busy={busy} />
-        <RosterColumn title={`결석/미처리 회원 ${absentMembers.length}명`} members={absentMembers} recordMap={recordMap} onMark={onMark} busy={busy} />
+    {!sessions.length ? <EmptyState title="모임이 없습니다" description="일정을 먼저 등록해 주세요." /> : <>
+      <div className="attendance-bulk-bar">
+        <span>선택 <b>{picked.size}</b>명 · 선택한 회원을 일괄 처리</span>
+        <div className="attendance-bulk-actions">
+          <button type="button" disabled={busy || !picked.size} onClick={() => bulk('present')}>출석</button>
+          <button type="button" disabled={busy || !picked.size} onClick={() => bulk('late')}>지각</button>
+          <button type="button" disabled={busy || !picked.size} onClick={() => bulk('absent')}>결석</button>
+          <button type="button" disabled={busy || !picked.size} onClick={() => bulk('excused')}>면제</button>
+        </div>
       </div>
-    )}
+      <div className="attendance-roster-grid">
+        <RosterColumn title={`출석한 회원 ${presentMembers.length}명`} members={presentMembers} recordMap={recordMap} onMark={onMark} busy={busy} picked={picked} onToggle={toggle} onSetMany={setMany} />
+        <RosterColumn title={`결석/미처리 회원 ${absentMembers.length}명`} members={absentMembers} recordMap={recordMap} onMark={onMark} busy={busy} picked={picked} onToggle={toggle} onSetMany={setMany} />
+      </div>
+    </>}
   </section>
 }
 
-function RosterColumn({ title, members, recordMap, onMark, busy }) {
+function RosterColumn({ title, members, recordMap, onMark, busy, picked, onToggle, onSetMany }) {
+  const memberIds = members.map((m) => m.id)
+  const allPicked = memberIds.length > 0 && memberIds.every((id) => picked?.has(id))
   return <article className="attendance-roster-column">
-    <h3>{title}</h3>
+    <h3>
+      {onSetMany && memberIds.length > 0 && <label className="attendance-col-selectall"><input type="checkbox" checked={allPicked} onChange={() => onSetMany(memberIds, !allPicked)} /> 전체</label>}
+      <span>{title}</span>
+    </h3>
     {!members.length ? <div className="admin-empty-card">해당 회원이 없습니다.</div> : members.map((member) => {
       const record = recordMap.get(String(member.id))
       const status = record?.status || 'absent'
       const lateNote = status === 'late' ? (Number(record?.points) <= -3 ? ' · 30분 초과(-3)' : ' · 30분 이내(-1)') : ''
-      return <div className="attendance-roster-row" key={member.id}>
+      return <div className="attendance-roster-row has-check" key={member.id}>
+        <input type="checkbox" className="attendance-row-check" checked={picked?.has(member.id) || false} onChange={() => onToggle?.(member.id)} />
         <div>
           <b>{member.name}</b>
           <span>{member.gi || member.generation || '-'} · {member.school || '-'}</span>
@@ -321,14 +368,10 @@ function AttendanceCodeForm({ initial, onSubmit, onCancel, busy }) {
   const [form, setForm] = useState({
     attendance_code_enabled: initial?.attendance_code_enabled !== false,
     attendance_code: initial?.attendance_code || '',
-    attendance_open_at: toLocalInput(initial?.attendance_open_at),
-    attendance_close_at: toLocalInput(initial?.attendance_close_at),
   })
   const set = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
   return <form className="data-form" onSubmit={(event) => { event.preventDefault(); onSubmit(form) }}>
     <Field label="출석코드"><input value={form.attendance_code} onChange={(event) => set('attendance_code', event.target.value)} placeholder="예: MAST24" /></Field>
-    <Field label="코드 오픈"><input type="datetime-local" value={form.attendance_open_at} onChange={(event) => set('attendance_open_at', event.target.value)} /></Field>
-    <Field label="코드 마감"><input type="datetime-local" value={form.attendance_close_at} onChange={(event) => set('attendance_close_at', event.target.value)} /></Field>
     <label className="check-field"><input type="checkbox" checked={form.attendance_code_enabled} onChange={(event) => set('attendance_code_enabled', event.target.checked)} /><span>출석코드 사용</span></label>
     <FormActions submitting={busy} submitLabel="코드 저장" onCancel={onCancel} />
   </form>
@@ -344,8 +387,6 @@ function AttendanceSessionForm({ initial, onSubmit, onCancel, busy }) {
     status: initial?.status || 'scheduled',
     attendance_code_enabled: initial?.attendance_code_enabled !== false,
     attendance_code: initial?.attendance_code || '',
-    attendance_open_at: toLocalInput(initial?.attendance_open_at),
-    attendance_close_at: toLocalInput(initial?.attendance_close_at),
     session_mode: initial?.session_mode || 'offline',
     is_orientation: initial?.is_orientation || false,
     target_generations: initial?.target_generations || '',
@@ -362,8 +403,6 @@ function AttendanceSessionForm({ initial, onSubmit, onCancel, busy }) {
       <Field label="상태"><select value={form.status} onChange={(event) => set('status', event.target.value)}><option value="scheduled">예정</option><option value="open">출석 가능</option><option value="closed">마감</option></select></Field>
       <Field label="모임 유형"><select value={form.session_mode} onChange={(event) => set('session_mode', event.target.value)}><option value="offline">오프라인</option><option value="online">온라인</option></select></Field>
       <Field label="출석코드"><input value={form.attendance_code} onChange={(event) => set('attendance_code', event.target.value)} placeholder="비워두면 나중에 입력" /></Field>
-      <Field label="코드 오픈"><input type="datetime-local" value={form.attendance_open_at} onChange={(event) => set('attendance_open_at', event.target.value)} /></Field>
-      <Field label="코드 마감"><input type="datetime-local" value={form.attendance_close_at} onChange={(event) => set('attendance_close_at', event.target.value)} /></Field>
     </div>
     <label className="check-field"><input type="checkbox" checked={form.attendance_code_enabled} onChange={(event) => set('attendance_code_enabled', event.target.checked)} /><span>출석코드 사용</span></label>
     <label className="check-field"><input type="checkbox" checked={form.is_orientation} onChange={(event) => set('is_orientation', event.target.checked)} /><span>OT(오리엔테이션) 모임</span></label>

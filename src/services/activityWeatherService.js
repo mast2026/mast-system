@@ -1,5 +1,36 @@
 import { requireSupabase, TABLES } from './baseService'
 import { ACTIVITY_WEATHER_PRESETS, calculateActivityWeather, calculateWeatherFromEvents, WEATHER_BASE_SCORE, OFFLINE_EVENT_TYPES, OFFLINE_TARGET_POINTS } from '../utils/activityWeather'
+import { findAttendanceMember } from './attendanceService'
+
+// 지각 감점은 점수 이벤트로 저장하지 않고 출석 기록에서 실시간 계산합니다.
+// (과거에 저장된 이벤트 타입은 합산에서 제외해 중복/잔존을 방지)
+const LATE_EVENT_TYPES = ['attendance_late', 'ot_late', 'ot_late_30']
+
+function norm(v) { return String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ') }
+function genNum(v) { return String(v ?? '').replace(/[^0-9]/g, '') }
+
+// team_matching 회원 → 출석용 레거시 members 행 매칭 (findAttendanceMember와 동일 기준)
+function matchLegacyMember(member, legacyList) {
+  if (member?.mast_member_id != null) {
+    const direct = (legacyList ?? []).find((l) => String(l.id) === String(member.mast_member_id))
+    if (direct) return direct
+  }
+  const n = norm(member?.name), s = norm(member?.school), g = genNum(member?.generation)
+  const strict = (legacyList ?? []).find((l) => norm(l.name) === n && (!s || norm(l.school) === s) && (!g || genNum(l.gi ?? l.generation) === g))
+  if (strict) return strict
+  const byName = (legacyList ?? []).filter((l) => norm(l.name) === n)
+  return byName.length === 1 ? byName[0] : null
+}
+
+// 출석 기록 중 '지각'을 가감점 항목으로 변환 (record.points가 감점값, 없으면 -1)
+function lateItemsFromRecords(records, titleById) {
+  return (records ?? []).filter((r) => String(r.status) === 'late').map((r) => {
+    const pts = Number(r.points)
+    const points = Number.isFinite(pts) && pts < 0 ? pts : -1
+    const title = (titleById && titleById.get(String(r.session_id))) || '모임'
+    return { id: `late-${r.id}`, event_type: 'attendance_late', points, metadata: { reason: `${title} 지각` } }
+  })
+}
 export { calculateActivityWeather, calculateWeatherFromEvents, gradeFor, weatherFor } from '../utils/activityWeather'
 // eslint-disable-next-line no-unused-vars
 const _legacyConsts = { OFFLINE_EVENT_TYPES, OFFLINE_TARGET_POINTS }
@@ -196,15 +227,23 @@ export async function getMemberActivityWeather(member) {
   const supabase = requireSupabase()
   const memberId = member?.id ?? member  // 하위 호환
 
-  // 70점 시작 + 관리자가 입력한 가감점 이벤트 합산
-  const eventRes = await supabase
-    .from(TABLES.scoreEvents).select('*')
-    .eq('member_id', memberId).eq('verified', true)
-  const scoreEvents = eventRes.data ?? []
+  // 70점 시작 + 관리자 가감점(지각 제외) + 출석 기록에서 실시간 계산한 지각 감점
+  const [eventRes, legacyMember, sessionRes] = await Promise.all([
+    supabase.from(TABLES.scoreEvents).select('*').eq('member_id', memberId).eq('verified', true),
+    findAttendanceMember(member).catch(() => null),
+    supabase.from('activity_sessions').select('id,title'),
+  ])
+  const manual = (eventRes.data ?? []).filter((e) => !LATE_EVENT_TYPES.includes(e.event_type))
+  let lateItems = []
+  if (legacyMember) {
+    const recRes = await supabase.from('activity_attendance_records').select('*').eq('member_id', legacyMember.id)
+    const titleById = new Map((sessionRes.data ?? []).map((s) => [String(s.id), s.title]))
+    lateItems = lateItemsFromRecords(recRes.data ?? [], titleById)
+  }
 
   return {
-    ...calculateWeatherFromEvents(scoreEvents),
-    raw: { scoreEvents },
+    ...calculateWeatherFromEvents([...manual, ...lateItems]),
+    raw: { scoreEvents: eventRes.data ?? [], attendanceLate: lateItems },
   }
 }
 
@@ -214,8 +253,16 @@ export async function getMemberActivityWeather(member) {
  */
 export async function getAllActivityWeather(members) {
   const supabase = requireSupabase()
-  const eventRes = await supabase.from(TABLES.scoreEvents).select('*').eq('verified', true)
+  const [eventRes, recRes, sessionRes, legacyRes] = await Promise.all([
+    supabase.from(TABLES.scoreEvents).select('*').eq('verified', true),
+    supabase.from('activity_attendance_records').select('*'),
+    supabase.from('activity_sessions').select('id,title'),
+    supabase.from('members').select('*'),
+  ])
   const allEvents = eventRes.data ?? []
+  const allRecords = recRes.data ?? []
+  const legacyList = legacyRes.data ?? []
+  const titleById = new Map((sessionRes.data ?? []).map((s) => [String(s.id), s.title]))
 
   return members.map((member) => {
     const testWeather = testWeatherResultForMember(member)
@@ -223,11 +270,14 @@ export async function getAllActivityWeather(members) {
     if (isWeatherExempt(member)) {
       return { ...member, activityWeather: weatherExemptResult(), weatherExempt: true, raw: {} }
     }
-    const scoreEvents = allEvents.filter((event) => Number(event.member_id) === Number(member.id))
+    const manual = allEvents.filter((event) => Number(event.member_id) === Number(member.id) && !LATE_EVENT_TYPES.includes(event.event_type))
+    const legacy = matchLegacyMember(member, legacyList)
+    const recs = legacy ? allRecords.filter((r) => String(r.member_id) === String(legacy.id)) : []
+    const lateItems = lateItemsFromRecords(recs, titleById)
     return {
       ...member,
-      activityWeather: calculateWeatherFromEvents(scoreEvents),
-      raw: { scoreEvents },
+      activityWeather: calculateWeatherFromEvents([...manual, ...lateItems]),
+      raw: { scoreEvents: manual, attendanceLate: lateItems },
     }
   })
 }

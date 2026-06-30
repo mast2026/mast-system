@@ -26,6 +26,18 @@
     <meta name="twitter:title" content="MAST 동아리 통합 시스템" />
     <meta name="twitter:description" content="공모전 팀매칭부터 홍보 미션, 활동날씨까지 한 곳에서 관리해요." />
     <meta name="twitter:image" content="/assets/hero/login-hero.webp" />
+
+    <!-- OneSignal Web Push SDK (v16) -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      window.OneSignalDeferred.push(async function (OneSignal) {
+        await OneSignal.init({
+          appId: "f2051dff-406b-4693-8f45-67f694fa6fff",
+          allowLocalhostAsSecureOrigin: true,
+        });
+      });
+    </script>
   </head>
   <body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
 </html>

@@ -26,6 +26,8 @@ const initial = {
   custom_tags: [],
   availability_note: '',
   message: '',
+  phone: '',
+  phone_consent: false,
 }
 
 const hashtagText = (tags = []) => tags.map((tag) => `#${tag}`).join(' ')
@@ -112,6 +114,11 @@ export default function ApplyTeamScreen() {
         </div>
         {!!form.custom_tags.length && <div className="custom-tag-list">{form.custom_tags.map((tag) => <button type="button" key={tag} onClick={() => removeCustomTag(tag)}>#{tag} ×</button>)}</div>}
       </Field>
+
+      <Field label="전화번호 (팀 합류 시 팀장에게 공개)" required>
+        <input type="tel" inputMode="tel" value={form.phone} onChange={(event) => set('phone', event.target.value)} required placeholder="예: 010-1234-5678" />
+      </Field>
+      <label className="check-field"><input type="checkbox" checked={form.phone_consent} onChange={(event) => set('phone_consent', event.target.checked)} required /><span>승인되어 팀에 합류하면 <b>팀장에게만</b> 내 전화번호가 공개되는 것에 동의합니다.</span></label>
 
       {error && <div className="form-error">{error}</div>}
       <FormActions submitting={submitting} submitLabel="지원서 제출" onCancel={() => navigate(-1)} />
