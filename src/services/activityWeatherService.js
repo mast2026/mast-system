@@ -22,14 +22,28 @@ function matchLegacyMember(member, legacyList) {
   return byName.length === 1 ? byName[0] : null
 }
 
-// 출석 기록 중 '지각'을 가감점 항목으로 변환 (record.points가 감점값, 없으면 -1)
-function lateItemsFromRecords(records, titleById) {
-  return (records ?? []).filter((r) => String(r.status) === 'late').map((r) => {
-    const pts = Number(r.points)
-    const points = Number.isFinite(pts) && pts < 0 ? pts : -1
-    const title = (titleById && titleById.get(String(r.session_id))) || '모임'
-    return { id: `late-${r.id}`, event_type: 'attendance_late', points, metadata: { reason: `${title} 지각` } }
-  })
+// 출석 기록을 활동날씨 가감점 항목으로 변환 (상태 자동 점수)
+//  - OT(오리엔테이션) 모임: 정참 +5 / 결석 -10 / 지각 -1·-3
+//  - 일반 모임: 지각 -1·-3 만 (정참·결석은 0)
+function attendanceItemsFromRecords(records, sessionById) {
+  const items = []
+  for (const r of records ?? []) {
+    const s = sessionById && sessionById.get(String(r.session_id))
+    if (!s) continue
+    const isOT = Boolean(s.is_orientation)
+    const title = s.title || (isOT ? 'OT' : '모임')
+    const status = String(r.status)
+    if (status === 'late') {
+      const pts = Number(r.points)
+      const points = Number.isFinite(pts) && pts < 0 ? pts : -1
+      items.push({ id: `att-${r.id}`, event_type: 'attendance', points, metadata: { reason: `${title} 지각` } })
+    } else if (isOT && status === 'present') {
+      items.push({ id: `att-${r.id}`, event_type: 'attendance', points: 5, metadata: { reason: `${title} 정참` } })
+    } else if (isOT && status === 'absent') {
+      items.push({ id: `att-${r.id}`, event_type: 'attendance', points: -10, metadata: { reason: `${title} 결석` } })
+    }
+  }
+  return items
 }
 export { calculateActivityWeather, calculateWeatherFromEvents, gradeFor, weatherFor } from '../utils/activityWeather'
 // eslint-disable-next-line no-unused-vars
@@ -231,19 +245,19 @@ export async function getMemberActivityWeather(member) {
   const [eventRes, legacyMember, sessionRes] = await Promise.all([
     supabase.from(TABLES.scoreEvents).select('*').eq('member_id', memberId).eq('verified', true),
     findAttendanceMember(member).catch(() => null),
-    supabase.from('activity_sessions').select('id,title'),
+    supabase.from('activity_sessions').select('id,title,is_orientation'),
   ])
   const manual = (eventRes.data ?? []).filter((e) => !LATE_EVENT_TYPES.includes(e.event_type))
-  let lateItems = []
+  let attendanceItems = []
   if (legacyMember) {
     const recRes = await supabase.from('activity_attendance_records').select('*').eq('member_id', legacyMember.id)
-    const titleById = new Map((sessionRes.data ?? []).map((s) => [String(s.id), s.title]))
-    lateItems = lateItemsFromRecords(recRes.data ?? [], titleById)
+    const sessionById = new Map((sessionRes.data ?? []).map((s) => [String(s.id), s]))
+    attendanceItems = attendanceItemsFromRecords(recRes.data ?? [], sessionById)
   }
 
   return {
-    ...calculateWeatherFromEvents([...manual, ...lateItems]),
-    raw: { scoreEvents: eventRes.data ?? [], attendanceLate: lateItems },
+    ...calculateWeatherFromEvents([...manual, ...attendanceItems]),
+    raw: { scoreEvents: eventRes.data ?? [], attendanceItems },
   }
 }
 
@@ -256,13 +270,13 @@ export async function getAllActivityWeather(members) {
   const [eventRes, recRes, sessionRes, legacyRes] = await Promise.all([
     supabase.from(TABLES.scoreEvents).select('*').eq('verified', true),
     supabase.from('activity_attendance_records').select('*'),
-    supabase.from('activity_sessions').select('id,title'),
+    supabase.from('activity_sessions').select('id,title,is_orientation'),
     supabase.from('members').select('*'),
   ])
   const allEvents = eventRes.data ?? []
   const allRecords = recRes.data ?? []
   const legacyList = legacyRes.data ?? []
-  const titleById = new Map((sessionRes.data ?? []).map((s) => [String(s.id), s.title]))
+  const sessionById = new Map((sessionRes.data ?? []).map((s) => [String(s.id), s]))
 
   return members.map((member) => {
     const testWeather = testWeatherResultForMember(member)
@@ -273,11 +287,11 @@ export async function getAllActivityWeather(members) {
     const manual = allEvents.filter((event) => Number(event.member_id) === Number(member.id) && !LATE_EVENT_TYPES.includes(event.event_type))
     const legacy = matchLegacyMember(member, legacyList)
     const recs = legacy ? allRecords.filter((r) => String(r.member_id) === String(legacy.id)) : []
-    const lateItems = lateItemsFromRecords(recs, titleById)
+    const attendanceItems = attendanceItemsFromRecords(recs, sessionById)
     return {
       ...member,
-      activityWeather: calculateWeatherFromEvents([...manual, ...lateItems]),
-      raw: { scoreEvents: manual, attendanceLate: lateItems },
+      activityWeather: calculateWeatherFromEvents([...manual, ...attendanceItems]),
+      raw: { scoreEvents: manual, attendanceItems },
     }
   })
 }

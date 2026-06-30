@@ -2496,7 +2496,7 @@ function AdminMembers() {
                   <span>인증률 {rate}%</span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <button onClick={function() { setEditing(m); }} style={btnSmall({ background: "#F0F4FB", color: BLUE, padding: "8px 10px" })}>수정</button>
+                  <button onClick={function() { setDetail(m); }} style={btnSmall({ background: "#F0F4FB", color: BLUE, padding: "8px 10px" })}>홍보 수정</button>
                   <button onClick={function() { deleteMember(m); }} style={btnSmall({ background: "#FDECEC", color: "#E04848", padding: "8px 10px" })}>삭제</button>
                 </div>
               </div>
@@ -2524,7 +2524,7 @@ function AdminMembers() {
                   <div style={{ fontSize: 11, color: SUB, marginTop: 2 }}>인증률 {rate}%</div>
                 </div>
                 <div style={{ display: "flex", gap: 5 }}>
-                  <button onClick={function() { setEditing(m); }} style={btnSmall({ background: "#F0F4FB", color: BLUE, padding: "5px 10px" })}>수정</button>
+                  <button onClick={function() { setDetail(m); }} style={btnSmall({ background: "#F0F4FB", color: BLUE, padding: "5px 10px" })}>홍보 수정</button>
                   <button onClick={function() { deleteMember(m); }} style={btnSmall({ background: "#FDECEC", color: "#E04848", padding: "5px 10px" })}>삭제</button>
                 </div>
               </div>
@@ -2623,6 +2623,17 @@ function MemberDetailModal(props) {
     if (props.onChanged) props.onChanged();
   }
 
+  async function changeStatus(row, status) {
+    if (!status || status === row.status) return;
+    var updates = { status: status, reviewed_at: new Date().toISOString() };
+    if (status === ST.PENDING || status === ST.MISSED || status === ST.REJECTED || status === ST.EXEMPTED) updates.submitted_at = null;
+    if (status === ST.SUBMITTED && !row.submitted_at) updates.submitted_at = new Date().toISOString();
+    var res = await supabase.from("promotion_mission_assignments").update(updates).eq("id", row.id);
+    if (res.error) { alert("상태 변경 실패: " + res.error.message); return; }
+    await load();
+    if (props.onChanged) props.onChanged();
+  }
+
   var rate = data && data.stats.rated > 0 ? Math.round(data.stats.earned / data.stats.rated * 100) : 0;
 
   return (
@@ -2650,18 +2661,29 @@ function MemberDetailModal(props) {
             <div style={{ padding: 30, textAlign: "center", fontSize: 13, color: SUB, background: "#F8FAFF", borderRadius: 12 }}>담당했던 미션이 없습니다.</div>
           ) : (
             <div style={{ border: "1px solid #F1F4F9", borderRadius: 12, overflow: isMobile ? "visible" : "hidden", padding: isMobile ? 8 : 0, background: isMobile ? "#F8FAFF" : "transparent" }}>
-              <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: "92px minmax(180px, 1.5fr) 96px minmax(150px, 1fr) 70px 72px", padding: "10px 14px", background: "#F8FAFF", fontSize: 12, fontWeight: 800, color: SUB }}>
+              <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: "92px minmax(180px, 1.5fr) 96px minmax(150px, 1fr) 70px 150px", padding: "10px 14px", background: "#F8FAFF", fontSize: 12, fontWeight: 800, color: SUB }}>
                 <div>날짜</div><div>미션</div><div>상태</div><div>특이사항</div><div>제출</div><div>관리</div>
               </div>
               {data.rows.map(function(r) {
                 return (
-                  <div key={r.mission_date} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto" : "92px minmax(180px, 1.5fr) 96px minmax(150px, 1fr) 70px 72px", gap: isMobile ? 8 : 0, padding: isMobile ? 12 : "12px 14px", marginTop: isMobile ? 8 : 0, borderTop: isMobile ? "none" : "1px solid #F1F4F9", borderRadius: isMobile ? 14 : 0, alignItems: isMobile ? "start" : "center", background: r.status === ST.REJECTED ? "#FFF8F8" : "#fff", columnGap: 8 }}>
+                  <div key={r.mission_date} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto" : "92px minmax(180px, 1.5fr) 96px minmax(150px, 1fr) 70px 150px", gap: isMobile ? 8 : 0, padding: isMobile ? 12 : "12px 14px", marginTop: isMobile ? 8 : 0, borderTop: isMobile ? "none" : "1px solid #F1F4F9", borderRadius: isMobile ? 14 : 0, alignItems: isMobile ? "start" : "center", background: r.status === ST.REJECTED ? "#FFF8F8" : "#fff", columnGap: 8 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, gridColumn: isMobile ? "1 / 2" : "auto", whiteSpace: "nowrap" }}>{r.mission_date}</div>
                     <div style={{ fontSize: 12, color: "#4A5568", gridColumn: isMobile ? "1 / -1" : "auto", lineHeight: "17px", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{r.title || "미션명 없음"}</div>
                     <div style={{ gridColumn: isMobile ? "2 / 3" : "auto", gridRow: isMobile ? "1 / 2" : "auto", justifySelf: isMobile ? "end" : "start" }}><span style={{ fontSize: 11, fontWeight: 700, color: stColor(r.status), background: stBg(r.status), padding: isMobile ? "5px 9px" : "3px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>{stLabel(r.status)}</span></div>
                     <div style={{ fontSize: 11, lineHeight: "16px", color: r.status === ST.REJECTED ? "#E04848" : SUB, fontWeight: r.status === ST.REJECTED ? 700 : 500, gridColumn: isMobile ? "1 / -1" : "auto", wordBreak: "keep-all" }}>{stNote(r.status)}</div>
                     <div style={{ fontSize: 11, color: SUB, gridColumn: isMobile ? "1 / 2" : "auto", whiteSpace: "nowrap" }}>{r.submitted_at ? fmtTime(r.submitted_at) : "-"}</div>
-                    <div><button onClick={function() { deleteRecord(r); }} style={btnSmall({ background: "#FDECEC", color: "#E04848", padding: "4px 8px", fontSize: 11 })}>초기화</button></div>
+                    <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+                      <select value={r.status} onChange={function(e) { changeStatus(r, e.target.value); }} style={{ fontSize: 11, padding: "4px 6px", borderRadius: 8, border: "1px solid #DDE4F0", fontFamily: FONT, color: INK, maxWidth: 92 }}>
+                        <option value={ST.SUBMITTED}>제출됨</option>
+                        <option value={ST.APPROVED}>인증완료</option>
+                        <option value={ST.LATE}>지각완료</option>
+                        <option value={ST.PENDING}>미제출</option>
+                        <option value={ST.MISSED}>미제출확정</option>
+                        <option value={ST.REJECTED}>반려</option>
+                        <option value={ST.EXEMPTED}>면제</option>
+                      </select>
+                      <button onClick={function() { deleteRecord(r); }} style={btnSmall({ background: "#FDECEC", color: "#E04848", padding: "4px 8px", fontSize: 11 })}>삭제</button>
+                    </div>
                   </div>
                 );
               })}
