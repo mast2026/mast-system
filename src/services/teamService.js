@@ -1,6 +1,7 @@
 import { TABLES, requireSupabase, throwIfError } from './baseService'
 import { canCreateTeamForContest, parseLeaderApplicationContestId } from './leaderService'
 import { isContestOpen } from './contestService'
+import { getAdminNotificationRecipientIds, sendOneSignalPush } from './notificationService'
 
 let capabilityPromise
 export const TEAM_PUBLIC_FIELDS = 'id,contest_id,leader_id,required_members,current_members,introduction,prize_distribution,needed_roles,work_style,meeting_style,interest_areas,personality_tags,skill_tags,status,closed_at'
@@ -260,20 +261,28 @@ export async function submitTeamMatchingComplete(teamId, leaderId) {
 
 async function notifyAdminsOfTeamExit(client, { team, memberId, actorId, status, reason }) {
   try {
-    const [{ data: admins }, { data: member }, { data: actor }, { data: contest }] = await Promise.all([
-      client.from(TABLES.members).select('id').in('role', ['admin', 'manager', 'professor']),
+    const [adminIds, { data: member }, { data: actor }, { data: contest }] = await Promise.all([
+      getAdminNotificationRecipientIds(client, 'contest'),
       client.from(TABLES.members).select('name').eq('id', memberId).maybeSingle(),
       client.from(TABLES.members).select('name').eq('id', actorId).maybeSingle(),
       client.from(TABLES.contests).select('title').eq('id', team.contest_id).maybeSingle(),
     ])
-    const payloads = (admins ?? []).map((admin) => ({
-      member_id: admin.id,
+    const payloads = (adminIds ?? []).map((adminId) => ({
+      member_id: adminId,
       type: status === 'leave_requested' ? 'team_leave_requested' : status === 'left' ? 'team_member_left' : 'team_member_removed',
       title: status === 'leave_requested' ? '팀원이 탈퇴를 신청했습니다.' : status === 'left' ? '팀원이 팀을 탈퇴했습니다.' : '팀원이 제외되었습니다.',
       body: `${contest?.title || '공모전'} / 팀 ${team.id}\n대상: ${member?.name || memberId}\n처리자: ${actor?.name || actorId}\n사유: ${reason || '-'}`,
       href: status === 'leave_requested' ? '/admin/leave-requests' : '/admin/teams',
     }))
-    if (payloads.length) await client.from(TABLES.notifications).insert(payloads)
+    if (payloads.length) {
+      await client.from(TABLES.notifications).insert(payloads)
+      await sendOneSignalPush({
+        memberIds: adminIds,
+        title: payloads[0].title,
+        body: payloads[0].body,
+        url: payloads[0].href,
+      })
+    }
   } catch (error) {
     console.warn('관리자 탈퇴 알림 생성 실패:', error?.message || error)
   }

@@ -9,24 +9,28 @@ import AdminTeamsScreen from './AdminTeamsScreen'
 import Badge from '../../components/Badge'
 import { ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
+import { useAuth } from '../../context/AuthContext'
 import { getAdminTeams } from '../../services/adminService'
 
 const tabs = [
   ['contests', '공모전', Trophy],
   ['leader-applications', '팀장 신청', ShieldCheck],
   ['teams', '팀 공고', UsersRound],
-  ['applications', '팀매칭 관리', FileText],
+  ['applications', '매칭 승인', FileText],
   ['results', '결과/동료평가', MessageSquareText],
 ]
 
 export default function AdminContestHubScreen() {
+  const { isFullAdmin } = useAuth()
   const [params, setParams] = useSearchParams()
   const tab = params.get('tab') || 'contests'
   const setTab = (next) => setParams({ tab: next })
+  const mainHref = isFullAdmin ? '/admin' : '/'
+  const mainLabel = isFullAdmin ? '관리자 메인' : '회원 메인'
 
   return <div className="admin-hub-page">
     <nav className="admin-inner-tabs admin-management-tabs admin-contest-tabs" aria-label="공모전 관리 메뉴">
-      <Link className="admin-icon-button mini" to="/admin" aria-label="관리자 메인"><Home /></Link>
+      <Link className="admin-icon-button mini" to={mainHref} aria-label={mainLabel}><Home /></Link>
       {tabs.map(([key, label, Icon]) => <button key={key} title={label} aria-label={label} className={tab === key ? 'active' : ''} type="button" onClick={() => setTab(key)}>
         <Icon />
         <span>{label}</span>
@@ -65,7 +69,7 @@ function ContestResultOverview() {
         </div>
         <div className="mini-list">
           {teams.map((team) => <div className="admin-result-team-link" key={team.id}>
-            <span>{team.leader?.name || '팀장'} 팀 · {team.members?.length ?? 0}명</span>
+            <span>{team.leader?.name || '팀장'} 팀 · {teamTotalMembers(team)}명</span>
             <Badge value={team.hasOpenChat ? '오픈채팅 등록' : '오픈채팅 미등록'} />
             <small>결과 등록/수정 · 동료평가 승인</small>
             <div className="table-actions">
@@ -87,4 +91,13 @@ function groupByContest(teams) {
     map.get(title).push(team)
   })
   return [...map.entries()]
+}
+
+function teamTotalMembers(team) {
+  const ids = new Set()
+  if (team?.leader_id) ids.add(Number(team.leader_id))
+  ;(team?.members ?? []).forEach((link) => {
+    if (!link.status || link.status === 'active') ids.add(Number(link.member_id))
+  })
+  return Math.max(1, ids.size || Number(team?.current_members ?? 0))
 }

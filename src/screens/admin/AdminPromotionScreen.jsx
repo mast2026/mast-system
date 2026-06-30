@@ -18,7 +18,7 @@ const tabMap = {
 }
 
 export default function AdminPromotionScreen() {
-  const { member, logout } = useAuth()
+  const { member, logout, isFullAdmin } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const initialTab = tabMap[params.get('tab')] || 'dashboard'
@@ -34,6 +34,6 @@ export default function AdminPromotionScreen() {
   }
 
   return <section className="admin-promotion-only">
-    <AdminApp session={legacySession} onLogout={logout} onExitToAdmin={() => navigate('/admin')} embedded initialTab={initialTab} />
+    <AdminApp session={legacySession} onLogout={logout} onExitToAdmin={() => navigate(isFullAdmin ? '/admin' : '/')} embedded initialTab={initialTab} />
   </section>
 }

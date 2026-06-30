@@ -99,12 +99,37 @@ export async function sendOneSignalPush({ memberIds, all, title, body, url } = {
   } catch { /* 발송 함수 미배포/오류여도 무시 */ }
 }
 
-// 관리자(운영진/지도교수)에게만 알림 + 푸시 (예: 팀장/팀매칭 신청 도착)
-export async function notifyAdmins({ title, body, href } = {}) {
+const FULL_ADMIN_ROLES = ['admin', 'manager', 'professor']
+
+function normalizeAdminSections(value) {
+  let arr = value
+  if (typeof value === 'string') {
+    try { arr = JSON.parse(value) } catch { arr = [] }
+  }
+  return Array.isArray(arr) ? arr.map(String) : []
+}
+
+export async function getAdminNotificationRecipientIds(client, section) {
+  try {
+    const { data, error } = await client
+      .from(TABLES.members)
+      .select('id,role,admin_sections')
+    if (error) throw error
+    return [...new Set((data ?? [])
+      .filter((member) => FULL_ADMIN_ROLES.includes(member.role) || (section && normalizeAdminSections(member.admin_sections).includes(section)))
+      .map((member) => member.id)
+      .filter(Boolean))]
+  } catch {
+    const { data } = await client.from(TABLES.members).select('id,role').in('role', FULL_ADMIN_ROLES)
+    return [...new Set((data ?? []).map((member) => member.id).filter(Boolean))]
+  }
+}
+
+// 전체 관리자 + 해당 섹션 권한을 받은 회원에게 알림 + 푸시
+export async function notifyAdmins({ title, body, href, section } = {}) {
   try {
     const client = requireSupabase()
-    const { data: admins } = await client.from(TABLES.members).select('id,role').in('role', ['admin', 'manager', 'professor'])
-    const ids = (admins ?? []).map((a) => a.id)
+    const ids = await getAdminNotificationRecipientIds(client, section)
     if (!ids.length) return
     await client.from(TABLES.notifications).insert(ids.map((id) => ({ member_id: id, type: 'notice', title, body, href })))
     await sendOneSignalPush({ memberIds: ids, title, body, url: href })

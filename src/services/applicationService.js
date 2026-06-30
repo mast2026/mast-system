@@ -1,5 +1,6 @@
 import { TABLES, requireSupabase, throwIfError } from './baseService'
-import { notifyAdmins } from './notificationService'
+import { notifyAdmins, sendOneSignalPush } from './notificationService'
+import { isContestOpen } from './contestService'
 import { detectTeamCapabilities, TEAM_PUBLIC_FIELDS } from './teamService'
 import { ensureTeamsForAcceptedLeaderApplications, getMyLeaderApplications } from './leaderService'
 
@@ -36,8 +37,11 @@ export async function submitApplication(teamId, applicantId, values) {
   if (Number(memberCount ?? 0) + (leaderCount ? 0 : 1) >= Number(team.required_members)) throw new Error('모집 정원이 이미 마감되었습니다.')
   if (await getExistingApplication(teamId, applicantId)) throw new Error('이미 지원한 팀입니다.')
 
-  const { data: contest, error: contestError } = await client.from(TABLES.contests).select('duplicate_allowed').eq('id', team.contest_id).maybeSingle()
+  const { data: contest, error: contestError } = await client.from(TABLES.contests).select('duplicate_allowed,is_active,registration_deadline').eq('id', team.contest_id).maybeSingle()
   throwIfError(contestError)
+  if (!contest || contest.is_active === false || !isContestOpen(contest)) {
+    throw new Error('접수가 마감된 공모전에는 지원할 수 없습니다.')
+  }
   if (contest?.duplicate_allowed === false) {
     const [{ data: contestTeams, error: contestTeamsError }, { data: applicantApplications, error: applicationsError }] = await Promise.all([
       client.from(TABLES.teams).select('id').eq('contest_id', team.contest_id),
@@ -67,7 +71,7 @@ export async function submitApplication(teamId, applicantId, values) {
   }
   throwIfError(error)
   // 팀매칭 신청 도착 → 관리자에게 알림
-  notifyAdmins({ title: '새 팀매칭 신청 도착', body: `${team.introduction || '공모전 팀'}에 새 팀 지원이 들어왔어요.`, href: '/admin/applications' })
+  notifyAdmins({ title: '새 팀매칭 신청 도착', body: `${team.introduction || '공모전 팀'}에 새 팀 지원이 들어왔어요.`, href: '/admin/applications', section: 'contest' })
   return data
 }
 export async function getLeaderApplicationsForTeam(teamId, leaderId) {
@@ -151,13 +155,17 @@ export async function deleteMyApplication(applicationId, memberId) {
 
 async function notifyApplicationResult(client, application, team, decision, rejectReason = '') {
   const { data: contest } = await client.from(TABLES.contests).select('title').eq('id', team.contest_id).maybeSingle()
+  const title = decision === 'accepted' ? '팀 지원이 승인되었습니다.' : '팀 지원 결과를 확인해 주세요.'
+  const body = decision === 'accepted'
+    ? `${contest?.title || '공모전'} 팀에 합류했습니다. 내 팀에서 상세 내용을 확인하세요.`
+    : (rejectReason || `${contest?.title || '공모전'} 팀 지원이 승인되지 않았습니다.`)
+  const href = decision === 'accepted' ? '/my/teams' : '/my/applications'
   await client.from(TABLES.notifications).insert({
     member_id: application.applicant_id,
     type: 'application_result',
-    title: decision === 'accepted' ? '팀 지원이 승인되었습니다.' : '팀 지원 결과를 확인해 주세요.',
-    body: decision === 'accepted'
-      ? `${contest?.title || '공모전'} 팀에 합류했습니다. 내 팀에서 상세 내용을 확인하세요.`
-      : (rejectReason || `${contest?.title || '공모전'} 팀 지원이 승인되지 않았습니다.`),
-    href: decision === 'accepted' ? '/my/teams' : '/my/applications',
+    title,
+    body,
+    href,
   })
+  await sendOneSignalPush({ memberIds: [application.applicant_id], title, body, url: href })
 }

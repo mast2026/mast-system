@@ -8,7 +8,7 @@ import AdminTable from '../../components/AdminTable'
 import { Field, FormActions } from '../../components/FormControls'
 import { ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
-import { createContest, getAllContests, setContestActive, updateContest } from '../../services/contestService'
+import { contestDeadlineEnd, createContest, getAllContests, setContestActive, updateContest } from '../../services/contestService'
 import { formatDate } from '../../utils/display'
 
 const blank = {
@@ -135,6 +135,6 @@ const dateInput = (value) => value ? String(value).slice(0, 10) : ''
 
 function deadlinePassed(value) {
   if (!value) return false
-  const deadline = new Date(`${String(value).slice(0, 10)}T23:59:59`)
-  return !Number.isNaN(deadline.getTime()) && deadline.getTime() < Date.now()
+  const deadline = contestDeadlineEnd(value)
+  return !!deadline && !Number.isNaN(deadline.getTime()) && deadline.getTime() < Date.now()
 }

@@ -20,15 +20,15 @@ export async function getAdminDashboardData() {
   const todayStr = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
   const todayMissionIds = new Set((promotion.missions ?? []).filter((m) => String(m.mission_date) === todayStr).map((m) => String(m.id)))
   const todayAssignments = (promotion.assignments ?? []).filter((a) => String(a.mission_date) === todayStr || todayMissionIds.has(String(a.mission_id)))
-  // 아직 모집 중인(확정 전) 팀만 — 팀확정 완료된 팀의 대기 지원은 제외
-  const recruitingTeamIds = new Set(teams.filter((t) => String(t.status) === 'recruiting').map((t) => Number(t.id)))
+  const teamsById = byId(teams)
+  const adminApprovalTeamIds = getAdminApprovalTeamIds(applications, teamsById)
   return {
     stats: {
       members: members.length,
       activeContests: contests.filter((item) => item.is_active).length,
       recruitingTeams: teams.filter((item) => item.status === 'recruiting').length,
       pendingLeaderApplications: leaderApplications.filter((item) => item.status === 'pending').length,
-      pendingApplications: applications.filter((item) => item.status === 'pending' && recruitingTeamIds.has(Number(item.team_id))).length,
+      pendingApplications: adminApprovalTeamIds.size,
       activityWeatherMembers: weatherRows.length,
       attendanceOpenSessions: attendance.sessions.filter((item) => ['open', 'scheduled'].includes(String(item.status ?? 'scheduled'))).length,
       attendanceUnchecked: Math.max(0, Number(attendance.members.length || 0) - Number(attendance.records.filter((row) => row.status === 'present').length || 0)),
@@ -83,12 +83,14 @@ export async function getAdminContestHubSummary() {
     safeSelectSoft(TABLES.applications),
     safeSelectSoft(TABLES.leaderApplications),
   ])
+  const teamsById = byId(teams.data)
+  const adminApprovalTeamIds = getAdminApprovalTeamIds(applications.data, teamsById)
   return {
     stats: {
       activeContests: contests.data.filter((item) => item.is_active !== false).length,
       recruitingTeams: teams.data.filter((item) => item.status === 'recruiting').length,
       pendingLeaderApplications: leaderApplications.data.filter((item) => item.status === 'pending').length,
-      pendingApplications: applications.data.filter((item) => item.status === 'pending').length,
+      pendingApplications: adminApprovalTeamIds.size,
     },
     warnings: [contests, teams, applications, leaderApplications].filter((item) => item.error).map((item) => item.error),
   }
@@ -124,6 +126,19 @@ export async function updateAdminTeamStatus(teamId, status) {
   if (status === 'recruiting') patch.closed_at = null
   const { data, error } = await requireSupabase().from(TABLES.teams).update(patch).eq('id', teamId).select('*').maybeSingle()
   throwIfError(error)
+  return data
+}
+
+export async function updateAdminApplicationStatus(applicationId, status) {
+  if (!['pending', 'accepted', 'rejected'].includes(status)) throw new Error('DB에서 지원하지 않는 신청 상태입니다.')
+  const { data, error } = await requireSupabase()
+    .from(TABLES.applications)
+    .update({ status })
+    .eq('id', applicationId)
+    .select('*')
+    .maybeSingle()
+  throwIfError(error)
+  if (!data) throw new Error('신청 정보를 찾지 못했습니다.')
   return data
 }
 
@@ -287,7 +302,13 @@ export async function getAdminApplications() {
   const membersById = byId(members)
   return (applications ?? []).map((application) => {
     const team = teamsById.get(application.team_id)
-    return { ...application, team, contest: contestsById.get(team?.contest_id), applicant: membersById.get(application.applicant_id) }
+    const leader = membersById.get(team?.leader_id)
+    return {
+      ...application,
+      team: team ? { ...team, leader } : team,
+      contest: contestsById.get(team?.contest_id),
+      applicant: membersById.get(application.applicant_id),
+    }
   })
 }
 
@@ -466,13 +487,21 @@ export async function updateAnnouncement(id, values) {
 
 export async function getAdminNotifications() { return safeSelect(TABLES.notifications) }
 export async function createNotification(values) {
-  return insertRow(TABLES.notifications, clean({
+  const notification = await insertRow(TABLES.notifications, clean({
     member_id: values.member_id ? Number(values.member_id) : null,
     type: values.type || 'notice',
     title: values.title,
     body: values.content,
     href: values.href,
   }))
+  await sendOneSignalPush({
+    all: !values.member_id,
+    memberIds: values.member_id ? [Number(values.member_id)] : undefined,
+    title: values.title,
+    body: values.content,
+    url: values.href,
+  })
+  return notification
 }
 
 export async function getAdminPeerReviews() {
@@ -777,6 +806,12 @@ function clean(object) {
   return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined && value !== ''))
 }
 function byId(rows = []) { return new Map((rows ?? []).map((row) => [row.id, row])) }
+function getAdminApprovalTeamIds(applications = [], teamsById = new Map()) {
+  return new Set((applications ?? [])
+    .filter((item) => String(item.status ?? '') === 'accepted' && !isAdminApprovedTeam(teamsById.get(item.team_id)))
+    .map((item) => Number(item.team_id)))
+}
+function isAdminApprovedTeam(team) { return ['matched', 'finished'].includes(String(team?.status ?? '').trim()) }
 function sortDesc(rows = []) { return [...rows].sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0)) }
 function sameMember(row, memberId) {
   const id = row.member_id ?? row.reviewee_id ?? row.reviewed_member_id ?? row.recipient_member_id ?? row.awardee_id

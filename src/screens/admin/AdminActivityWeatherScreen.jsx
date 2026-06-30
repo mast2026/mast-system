@@ -101,15 +101,15 @@ function EventRow({ ev, busy, onEdit, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(String(ev.points))
   return <div className="score-event-row">
-    <b>{ev.label}</b>
+    <b>{ev.label}{ev.auto && <small>자동 반영</small>}</b>
     {editing ? <span className="score-event-edit">
       <input type="number" value={value} onChange={(e) => setValue(e.target.value)} />
       <button type="button" className="table-button" disabled={busy} onClick={() => { onEdit(ev.id, Number(value)); setEditing(false) }}>저장</button>
       <button type="button" className="table-button" onClick={() => { setValue(String(ev.points)); setEditing(false) }}>취소</button>
     </span> : <>
       <em className={ev.points >= 0 ? 'up' : 'down'}>{ev.points >= 0 ? '+' : ''}{ev.points}</em>
-      <button type="button" className="table-button" disabled={busy} onClick={() => setEditing(true)}>수정</button>
-      <button type="button" className="table-button danger" disabled={busy} onClick={() => onDelete(ev.id)} aria-label="삭제"><Trash2 size={14}/></button>
+      {!ev.auto && <button type="button" className="table-button" disabled={busy} onClick={() => setEditing(true)}>수정</button>}
+      {!ev.auto && <button type="button" className="table-button danger" disabled={busy} onClick={() => onDelete(ev.id)} aria-label="삭제"><Trash2 size={14}/></button>}
     </>}
   </div>
 }

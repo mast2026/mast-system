@@ -33,9 +33,25 @@ export async function setContestActive(id, isActive) {
   throwIfError(error); return data ?? { id, is_active: isActive }
 }
 
+export function contestDeadlineEnd(value) {
+  if (!value) return null
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 23, 59, 59, 999)
+  }
+  const raw = String(value).trim()
+  const parts = raw.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/)
+  if (parts) {
+    const [, year, month, day] = parts
+    return new Date(Number(year), Number(month) - 1, Number(day), 23, 59, 59, 999)
+  }
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) return null
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 23, 59, 59, 999)
+}
+
 export function isContestOpen(contest) {
   if (!contest?.registration_deadline) return true
-  const deadline = new Date(`${String(contest.registration_deadline).slice(0, 10)}T23:59:59`)
-  if (Number.isNaN(deadline.getTime())) return true
+  const deadline = contestDeadlineEnd(contest.registration_deadline)
+  if (!deadline || Number.isNaN(deadline.getTime())) return false
   return deadline.getTime() >= Date.now()
 }

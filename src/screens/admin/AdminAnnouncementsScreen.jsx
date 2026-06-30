@@ -8,10 +8,12 @@ import AdminTable from '../../components/AdminTable'
 import { Field, FormActions } from '../../components/FormControls'
 import { ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
+import { useAuth } from '../../context/AuthContext'
 import { createAnnouncement, getAdminAnnouncements, updateAnnouncement } from '../../services/adminService'
 import { formatDate, titleOf } from '../../utils/display'
 
 export default function AdminAnnouncementsScreen() {
+  const { isFullAdmin } = useAuth()
   const q = useQuery(getAdminAnnouncements, [])
   const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -29,9 +31,11 @@ export default function AdminAnnouncementsScreen() {
   }
   if (q.loading) return <LoadingState />
   if (q.error) return <ErrorState error={q.error} retry={q.retry} />
+  const mainHref = isFullAdmin ? '/admin' : '/'
+  const mainLabel = isFullAdmin ? '관리자 메인' : '회원 메인'
   return <>
     <PageHeader title="공지 관리" description="회원 화면에 노출할 공지를 관리합니다." action={<div className="page-actions">
-      <Link className="button secondary" to="/admin"><Home/>관리자 메인</Link>
+      <Link className="button secondary" to={mainHref}><Home/>{mainLabel}</Link>
       <button className="button primary" onClick={() => setEditing({ title: '', content: '', is_published: true, sync_notification: true })}><Plus/>등록</button>
     </div>} />
     {notice && <div className="form-notice">{notice}</div>}

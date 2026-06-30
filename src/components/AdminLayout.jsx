@@ -13,8 +13,8 @@ const adminNavGroups = [
 ]
 export default function AdminLayout() {
   const { member, logout, isFullAdmin, adminSections } = useAuth(); const navigate = useNavigate(); const location = useLocation()
-  // 직책별 권한: 임원진은 허용된 섹션 메뉴만 보이고, 그 외 경로는 대시보드로 되돌립니다.
-  const allowPath = (to) => isFullAdmin || to === '/admin' || (adminSections || []).includes(sectionKeyForPath(to))
+  // 직책별 권한: 허용된 섹션 메뉴만 보이고, 그 외 경로는 대시보드로 되돌립니다.
+  const allowPath = (to) => isFullAdmin || (to !== '/admin' && (adminSections || []).includes(sectionKeyForPath(to)))
   const visibleGroups = adminNavGroups
     .map((group) => ({ ...group, items: group.items.filter(([to]) => allowPath(to)) }))
     .filter((group) => group.items.length)
@@ -22,6 +22,9 @@ export default function AdminLayout() {
   const [sideCollapsed, setSideCollapsed] = useState(() => localStorage.getItem('mast_admin_side_collapsed') === 'true')
   const isPromotionAdmin = location.pathname.startsWith('/admin/promotion')
   const roleLabel = member?.role === 'professor' ? '교수' : (!isFullAdmin && member?.position_title) ? member.position_title : '관리자'
+  const mainTarget = isFullAdmin ? '/admin' : '/'
+  const mainLabel = isFullAdmin ? '관리자 메인' : '회원 메인'
+  const MainIcon = isFullAdmin ? LayoutDashboard : Home
   const toggleTop = () => {
     const next = !topCollapsed; setTopCollapsed(next)
     localStorage.setItem('mast_admin_top_expanded', String(!next))
@@ -31,8 +34,8 @@ export default function AdminLayout() {
     localStorage.setItem('mast_admin_side_collapsed', String(next))
   }
   useEffect(() => { if (localStorage.getItem('mast_admin_top_expanded') === null) setTopCollapsed(true) }, [])
-  // 권한 없는 섹션 직접 진입 차단 (임원진)
-  if (!canAccessAdminPath(adminSections, location.pathname, isFullAdmin)) return <Navigate to="/admin" replace />
+  // 권한 없는 섹션 직접 진입 차단
+  if (!canAccessAdminPath(adminSections, location.pathname, isFullAdmin)) return <Navigate to={mainTarget} replace />
   if (isPromotionAdmin) {
     return <main className="admin-promotion-standalone"><Outlet /></main>
   }
@@ -69,9 +72,9 @@ export default function AdminLayout() {
           <span>출석 · 홍보 · 공모전 통합 운영</span>
         </div>
         <div className="admin-top-actions">
-          {location.pathname !== '/admin' && <button type="button" className="admin-collapse-button" onClick={() => navigate('/admin')} aria-label="관리자 메인으로 이동">
-            <LayoutDashboard />
-            <span>관리자 메인</span>
+          {location.pathname !== mainTarget && <button type="button" className="admin-collapse-button" onClick={() => navigate(mainTarget)} aria-label={`${mainLabel}으로 이동`}>
+            <MainIcon />
+            <span>{mainLabel}</span>
           </button>}
           <button type="button" className="admin-collapse-button" onClick={toggleTop} aria-label={topCollapsed ? '상단 펼치기' : '상단 접기'}>
             {topCollapsed ? <ChevronDown /> : <ChevronUp />}

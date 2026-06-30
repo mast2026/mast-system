@@ -4,9 +4,11 @@ import { Home, LogOut } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
 import { EmptyState, ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
+import { useAuth } from '../../context/AuthContext'
 import { approveLeaveRequest, getLeaveRequests, rejectLeaveRequest } from '../../services/adminService'
 
 export default function AdminLeaveRequestsScreen() {
+  const { isFullAdmin } = useAuth()
   const q = useQuery(getLeaveRequests, [])
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -29,10 +31,12 @@ export default function AdminLeaveRequestsScreen() {
   if (q.loading) return <LoadingState label="탈퇴 신청을 불러오는 중" />
   if (q.error) return <ErrorState error={q.error} retry={q.retry} />
   const rows = q.data ?? []
+  const mainHref = isFullAdmin ? '/admin' : '/'
+  const mainLabel = isFullAdmin ? '관리자 메인' : '회원 메인'
 
   return <>
     <div style={{ marginBottom: 12 }}>
-      <Link to="/admin" className="button secondary small"><Home size={16} /> 관리자 메인</Link>
+      <Link to={mainHref} className="button secondary small"><Home size={16} /> {mainLabel}</Link>
     </div>
     <PageHeader title="팀 탈퇴 신청" description="팀원이 신청한 탈퇴를 승인하거나 반려합니다. 승인 시 팀에서 제외됩니다." />
     {notice && <div className="form-notice">{notice}</div>}

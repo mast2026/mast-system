@@ -6,12 +6,29 @@ import Modal from '../../components/Modal'
 import { Field, FormActions } from '../../components/FormControls'
 import { ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
+import { useAuth } from '../../context/AuthContext'
 import { createScoreEvent, deleteAdminMember, deleteScoreEvent, getAdminMemberStatsRows, getMemberAdminSections, getMemberPositions, updateMemberAdminFields, updateScoreEvent } from '../../services/adminService'
 import { SCORE_RUBRIC } from '../../utils/activityWeather'
 import { ADMIN_SECTIONS, normalizeSections } from '../../utils/adminSections'
 
 const GAINS = SCORE_RUBRIC.filter((item) => item.group === 'gain')
 const DEDUCTS = SCORE_RUBRIC.filter((item) => item.group === 'deduct')
+const EXEC_DEPARTMENTS = [
+  '홍보기획팀',
+  '개발운영팀',
+  '경영전략팀',
+  '교육운영팀',
+  '데이터리서치팀',
+  '디자인기획팀',
+  '사업운영팀',
+  '대외협력팀',
+  '소셜아카이브팀',
+  '크리에이티브팀',
+  '피플팀',
+]
+const EXEC_STANDALONE_TITLES = ['회장', '부회장']
+const EXEC_RANKS = ['팀장', '부팀장', '팀원']
+const PRIVILEGED_POSITION_TYPES = ['exec', 'professor', 'advisor']
 
 const roleLabels = {
   member: '회원',
@@ -21,6 +38,7 @@ const roleLabels = {
 }
 
 export default function AdminMembersScreen() {
+  const { isFullAdmin } = useAuth()
   const q = useQuery(async () => {
     const [rows, positions, sectionMap] = await Promise.all([getAdminMemberStatsRows(), getMemberPositions(), getMemberAdminSections()])
     return rows.map((row) => ({ ...row, position_title: positions[row.id] ?? row.position_title ?? null, admin_sections: sectionMap[row.id] ?? row.admin_sections ?? [] }))
@@ -38,6 +56,8 @@ export default function AdminMembersScreen() {
 
   if (q.loading && !q.data) return <LoadingState />
   if (q.error && !q.data) return <ErrorState error={q.error} retry={q.retry} />
+  const mainHref = isFullAdmin ? '/admin' : '/'
+  const mainLabel = isFullAdmin ? '관리자 홈으로' : '회원 홈으로'
 
   const keyword = search.trim().toLowerCase()
   const rows = (q.data ?? []).filter((row) => {
@@ -81,7 +101,7 @@ export default function AdminMembersScreen() {
     <section className="admin-member-list-panel">
       <header>
         <div className="admin-member-header-title">
-          <Link className="admin-icon-button mini" to="/admin" aria-label="관리자 홈으로"><Home /></Link>
+          <Link className="admin-icon-button mini" to={mainHref} aria-label={mainLabel}><Home /></Link>
           <div>
             <h1>회원 관리</h1>
             <p>회원을 선택하면 출결, 홍보, 공모전, 활동날씨와 직책을 확인할 수 있습니다. 임원진이 먼저, 그 다음 기수·이름·학교 순으로 정렬됩니다.</p>
@@ -140,6 +160,7 @@ export default function AdminMembersScreen() {
 }
 
 function MemberDetailModal({ member, onClose, onSaved, onScoreChanged }) {
+  const initialExecPosition = parseExecPosition(member.position_title)
   const [name, setName] = useState(member.name || '')
   const [school, setSchool] = useState(member.school || '')
   const [major, setMajor] = useState(member.major || '')
@@ -151,19 +172,19 @@ function MemberDetailModal({ member, onClose, onSaved, onScoreChanged }) {
     if (t) return 'exec'
     return 'member'
   })
-  const [positionTitle, setPositionTitle] = useState(() => {
-    const t = String(member.position_title || '').trim()
-    return ['지도교수', '고문'].includes(t) ? '' : t
-  })
+  const [execDepartment, setExecDepartment] = useState(initialExecPosition.department)
+  const [execRank, setExecRank] = useState(initialExecPosition.rank)
   const [sections, setSections] = useState(() => normalizeSections(member.admin_sections))
   const toggleSection = (key) => setSections((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const canConfigureAdminSections = PRIVILEGED_POSITION_TYPES.includes(memberType)
 
   const save = async (event) => {
     event.preventDefault()
-    if (memberType === 'exec' && !positionTitle.trim()) {
-      setError('임원진 직책명을 입력해 주세요. (예: 회장, 총무)')
+    const isStandaloneExecTitle = EXEC_STANDALONE_TITLES.includes(execDepartment)
+    if (memberType === 'exec' && (!execDepartment || (!isStandaloneExecTitle && !execRank))) {
+      setError('임원진 직책 또는 소속 팀과 직급을 선택해 주세요.')
       return
     }
     setBusy(true)
@@ -171,17 +192,18 @@ function MemberDetailModal({ member, onClose, onSaved, onScoreChanged }) {
     try {
       // role(관리자 접근 권한)은 그대로 두고, 직책은 position_title 로만 관리
       // status 는 team_matching_members 에 컬럼이 없어 저장하지 않습니다.
-      const titleByType = { member: null, exec: positionTitle.trim(), professor: '지도교수', advisor: '고문' }
+      const execTitle = isStandaloneExecTitle ? execDepartment : `${execDepartment} ${execRank}`.trim()
+      const titleByType = { member: null, exec: execTitle, professor: '지도교수', advisor: '고문' }
       const nextTitle = titleByType[memberType] ?? null
-      // 임원진일 때만 직책별 관리자 권한 저장, 그 외에는 권한 회수([])
-      const nextSections = memberType === 'exec' ? sections : []
+      // 임원진/지도교수/고문일 때만 직책별 관리자 권한 저장, 그 외에는 권한 회수([])
+      const nextSections = canConfigureAdminSections ? sections : []
       await updateMemberAdminFields(member.id, { name, school, major, generation, position_title: nextTitle, admin_sections: nextSections })
       onSaved('회원 정보를 저장했습니다.')
     } catch (err) {
       const message = /admin_sections/.test(String(err.message))
-        ? '임원진 권한 저장에 실패했습니다. Supabase에서 add-admin-sections.sql 을 실행해 admin_sections 컬럼을 추가해 주세요.'
+        ? '관리자 권한 저장에 실패했습니다. Supabase에서 add-admin-sections.sql 을 실행해 admin_sections 컬럼을 추가해 주세요.'
         : /position_title/.test(String(err.message))
-        ? '임원진 직책 저장에 실패했습니다. Supabase에서 add-position-title.sql 을 실행해 position_title 컬럼을 추가해 주세요.'
+        ? '직책 저장에 실패했습니다. Supabase에서 add-position-title.sql 을 실행해 position_title 컬럼을 추가해 주세요.'
         : err.message
       setError(message)
     } finally {
@@ -290,10 +312,24 @@ function MemberDetailModal({ member, onClose, onSaved, onScoreChanged }) {
             <option value="advisor">고문</option>
           </select>
         </Field>
-        {memberType === 'exec' && <Field label="임원진 직책명">
-          <input value={positionTitle} onChange={(event) => setPositionTitle(event.target.value)} placeholder="예: 회장, 부회장, 총무" />
+        {memberType === 'exec' && <Field label="임원진 직책/소속 팀">
+          <select value={execDepartment} onChange={(event) => setExecDepartment(event.target.value)}>
+            <option value="">직책 또는 팀 선택</option>
+            <optgroup label="대표 직책">
+              {EXEC_STANDALONE_TITLES.map((title) => <option value={title} key={title}>{title}</option>)}
+            </optgroup>
+            <optgroup label="팀">
+            {EXEC_DEPARTMENTS.map((department) => <option value={department} key={department}>{department}</option>)}
+            </optgroup>
+          </select>
         </Field>}
-        {memberType === 'exec' && <Field label="관리자 권한 (직책별 기능 제한)">
+        {memberType === 'exec' && !EXEC_STANDALONE_TITLES.includes(execDepartment) && <Field label="임원진 직급">
+          <select value={execRank} onChange={(event) => setExecRank(event.target.value)}>
+            <option value="">직급 선택</option>
+            {EXEC_RANKS.map((rank) => <option value={rank} key={rank}>{rank}</option>)}
+          </select>
+        </Field>}
+        {canConfigureAdminSections && <Field label="관리자 권한 (직책별 기능 제한)">
           <div className="admin-section-perms">
             {ADMIN_SECTIONS.map((s) => {
               const on = sections.includes(s.key)
@@ -302,9 +338,9 @@ function MemberDetailModal({ member, onClose, onSaved, onScoreChanged }) {
               </button>
             })}
           </div>
-          <small className="admin-section-perms-hint">체크한 기능만 이 임원진의 회원 홈·관리자 콘솔에 표시됩니다. 비워두면 관리자 기능 없이 직책만 부여됩니다.</small>
+          <small className="admin-section-perms-hint">체크한 기능만 이 회원의 회원 홈·관리자 콘솔에 표시됩니다. 비워두면 관리자 기능 없이 직책만 부여됩니다.</small>
         </Field>}
-        <div className="admin-role-note"><ShieldCheck /> 임원진은 회원 로그인 그대로 두고, 체크한 관리자 기능만 회원 홈과 관리자 콘솔에서 사용할 수 있어요. 지도교수·고문은 파란색, 임원진은 노랑·하늘색 테두리로 표시됩니다.</div>
+        <div className="admin-role-note"><ShieldCheck /> 임원진·지도교수·고문은 회원 로그인 그대로 두고, 체크한 관리자 기능만 회원 홈과 관리자 콘솔에서 사용할 수 있어요. 지도교수·고문은 파란색, 임원진은 노랑·하늘색 테두리로 표시됩니다.</div>
         {error && <div className="form-error">{error}</div>}
         <FormActions submitting={busy} submitLabel="회원 정보 저장" onCancel={onClose} />
         <button className="button danger admin-delete-member-button" type="button" onClick={remove} disabled={busy}>
@@ -357,15 +393,15 @@ function MemberScoreRow({ ev, busy, onEdit, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(String(ev.points))
   return <div className="score-event-row">
-    <b>{ev.label}</b>
+    <b>{ev.label}{ev.auto && <small>자동 반영</small>}</b>
     {editing ? <span className="score-event-edit">
       <input type="number" value={value} onChange={(e) => setValue(e.target.value)} />
       <button type="button" className="table-button" disabled={busy} onClick={() => { onEdit(ev.id, Number(value)); setEditing(false) }}>저장</button>
       <button type="button" className="table-button" onClick={() => { setValue(String(ev.points)); setEditing(false) }}>취소</button>
     </span> : <>
       <em className={ev.points >= 0 ? 'up' : 'down'}>{ev.points >= 0 ? '+' : ''}{ev.points}</em>
-      <button type="button" className="table-button" disabled={busy} onClick={() => setEditing(true)}>수정</button>
-      <button type="button" className="table-button danger" disabled={busy} onClick={() => onDelete(ev.id)}><Trash2 size={13} /></button>
+      {!ev.auto && <button type="button" className="table-button" disabled={busy} onClick={() => setEditing(true)}>수정</button>}
+      {!ev.auto && <button type="button" className="table-button danger" disabled={busy} onClick={() => onDelete(ev.id)}><Trash2 size={13} /></button>}
     </>}
   </div>
 }
@@ -375,6 +411,17 @@ function InfoCard({ icon: Icon, label, value, note }) {
 }
 
 const ADVISOR_TITLES = ['지도교수', '고문']
+function parseExecPosition(value) {
+  const title = String(value || '').trim()
+  if (!title || ADVISOR_TITLES.includes(title)) return { department: '', rank: '' }
+  if (EXEC_STANDALONE_TITLES.includes(title)) return { department: title, rank: '' }
+  const department = EXEC_DEPARTMENTS.find((item) => title === item || title.startsWith(`${item} `)) || ''
+  const rank = department ? title.slice(department.length).trim() : ''
+  return {
+    department,
+    rank: EXEC_RANKS.includes(rank) ? rank : '',
+  }
+}
 // 직책 분류: advisor(지도교수·고문, 파란 그라데) / exec(임원진, 노랑·하늘 그라데) / member
 function memberKind(member) {
   const t = String(member?.position_title || '').trim()

@@ -15,6 +15,8 @@ alter table public.team_matching_notifications
   check (type in (
     'notice','announcement','attendance','attendance_open',
     'promotion_target','promotion',
-    'application_result','leader_application_result',
-    'team','team_member','system','general'
+    'application_result','application_pending',
+    'leader_application_result',
+    'team','team_member','team_leave_requested','team_member_left','team_member_removed',
+    'system','general'
   ));

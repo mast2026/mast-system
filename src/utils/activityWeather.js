@@ -103,7 +103,8 @@ export function normalizeScoreEvent(event) {
   const key = event?.event_type ?? ''
   const reason = event?.metadata?.reason ?? event?.reason ?? ''
   const label = reason || RUBRIC_BY_KEY[key]?.label || key || '점수 조정'
-  return { id: event?.id, key, points, label, createdAt: event?.created_at ?? null }
+  const auto = Boolean(event?.metadata?.auto || event?.auto || event?.derived)
+  return { id: event?.id, key, points, label, createdAt: event?.created_at ?? null, auto }
 }
 
 /**

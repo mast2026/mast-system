@@ -30,11 +30,11 @@ export function sectionKeyForPath(pathname) {
   return hit ? hit.key : null
 }
 
-// 해당 경로에 접근 가능한지 (전체 관리자면 무조건 허용, 대시보드는 항상 허용)
+// 해당 경로에 접근 가능한지 (전체 관리자면 무조건 허용, 일부 권한 회원은 허용 섹션만)
 export function canAccessAdminPath(sections, pathname, isFullAdmin) {
   if (isFullAdmin) return true
   const path = String(pathname || '').split('?')[0]
-  if (path === '/admin') return true
+  if (path === '/admin') return false
   const key = sectionKeyForPath(path)
   return !!key && sections.includes(key)
 }

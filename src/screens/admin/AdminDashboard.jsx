@@ -47,7 +47,7 @@ export default function AdminDashboard() {
     { section: 'promotion', label: '홍보 미제출자 알림 보내기', count: stats.promotionMissing, cta: '보내기', text: '버튼 한 번으로 미제출자 전원에게 알림 발송.', action: sendPromotionAlert, Icon: Send, tone: 'orange' },
     stats.promotionPending > 0 && { section: 'promotion', label: '홍보 인증 승인', count: stats.promotionPending, cta: '승인', text: '제출된 홍보 인증을 승인하세요.', to: '/admin/promotion?tab=certs', Icon: CheckCircle2, tone: 'green' },
     stats.pendingLeaderApplications > 0 && { section: 'contest', label: '공모전 팀장 신청', count: stats.pendingLeaderApplications, cta: '확인', text: '팀 공고 작성 요청을 확인하세요.', to: '/admin/contest?tab=leader-applications', Icon: ShieldCheck, tone: 'red' },
-    stats.pendingApplications > 0 && { section: 'contest', label: '팀매칭 신청', count: stats.pendingApplications, cta: '확인', text: '회원들의 팀 지원을 확인하세요.', to: '/admin/applications', Icon: UsersRound, tone: 'blue' },
+    stats.pendingApplications > 0 && { section: 'contest', label: '매칭 신청팀 승인', count: stats.pendingApplications, cta: '확인', text: '팀장이 선정한 최종 팀원을 확인하고 승인하세요.', to: '/admin/applications', Icon: UsersRound, tone: 'blue' },
     leaveCount > 0 && { section: 'contest', label: '팀 탈퇴 신청', count: leaveCount, cta: '확인', text: '팀원이 신청한 탈퇴를 승인/반려하세요.', to: '/admin/leave-requests', Icon: LeaveIcon, tone: 'red' },
   ].filter(Boolean).filter((t) => canAccessSection(t.section))
   const taskTotal = tasks.reduce((sum, item) => sum + Math.max(0, Number(item.count || 0)), 0)

@@ -5,6 +5,41 @@ const ADMIN_LOGIN_CODE = import.meta.env.VITE_ADMIN_LOGIN_CODE || 'MAST-ADMIN'
 const ADMIN_ROLES = ['admin', 'manager', 'professor']
 let passwordCapabilityPromise
 
+function normalizeAdminSections(value) {
+  let arr = value
+  if (typeof value === 'string') {
+    try { arr = JSON.parse(value) } catch { arr = [] }
+  }
+  return Array.isArray(arr) ? arr.map(String).filter(Boolean) : []
+}
+
+async function getAdminSectionMap(ids) {
+  const uniqueIds = [...new Set((ids ?? []).filter((id) => id !== undefined && id !== null))]
+  if (!uniqueIds.length) return {}
+  try {
+    const { data, error } = await requireSupabase()
+      .from(TABLES.members)
+      .select('id,admin_sections')
+      .in('id', uniqueIds)
+    if (error) return {}
+    const map = {}
+    ;(data ?? []).forEach((row) => { map[row.id] = normalizeAdminSections(row.admin_sections) })
+    return map
+  } catch {
+    return {}
+  }
+}
+
+async function attachAdminSections(rows) {
+  if (Array.isArray(rows)) {
+    const map = await getAdminSectionMap(rows.map((row) => row.id))
+    return rows.map((row) => ({ ...row, admin_sections: map[row.id] ?? normalizeAdminSections(row.admin_sections) }))
+  }
+  if (!rows) return rows
+  const map = await getAdminSectionMap([rows.id])
+  return { ...rows, admin_sections: map[rows.id] ?? normalizeAdminSections(rows.admin_sections) }
+}
+
 async function detectPasswordCapabilities() {
   if (!passwordCapabilityPromise) {
     passwordCapabilityPromise = (async () => {
@@ -25,11 +60,11 @@ async function detectPasswordCapabilities() {
 export async function getMembers() {
   const { data, error } = await requireSupabase().from(TABLES.members).select(PUBLIC_MEMBER_FIELDS).order('id', { ascending: true })
   throwIfError(error)
-  return data ?? []
+  return attachAdminSections(data ?? [])
 }
 
 export async function getMember(id) {
-  return selectOne(TABLES.members, id)
+  return attachAdminSections(await selectOne(TABLES.members, id))
 }
 
 export async function findMemberByName(name) {
@@ -41,8 +76,9 @@ export async function findMemberByName(name) {
 export async function findMembersByName(name) {
   const { data: members, error } = await requireSupabase().from(TABLES.members).select(PUBLIC_MEMBER_FIELDS).order('id', { ascending: true })
   throwIfError(error)
+  const rows = await attachAdminSections(members ?? [])
   const keyword = String(name ?? '').trim().toLocaleLowerCase()
-  return (members ?? []).filter((member) => String(member.name ?? '').trim().toLocaleLowerCase() === keyword)
+  return rows.filter((member) => String(member.name ?? '').trim().toLocaleLowerCase() === keyword)
 }
 
 export async function checkHasPassword(memberId) {
@@ -184,7 +220,7 @@ export async function loginAdminWithCode(code) {
     .maybeSingle()
   throwIfError(error)
   if (!data) throw new Error('DB에 관리자 계정이 없습니다.')
-  return data
+  return attachAdminSections(data)
 }
 
 export async function loginPrivilegedMemberWithCode(memberId, code) {
@@ -200,7 +236,7 @@ export async function loginPrivilegedMemberWithCode(memberId, code) {
   throwIfError(error)
   if (!data) throw new Error('관리자 계정을 찾을 수 없습니다.')
   if (!ADMIN_ROLES.includes(data.role)) throw new Error('관리자 페이지 접근 권한이 없는 회원입니다.')
-  return data
+  return attachAdminSections(data)
 }
 
 async function hashPassword(password) {

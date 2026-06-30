@@ -13,7 +13,7 @@ import PageHeader from '../components/PageHeader'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import { useAuth } from '../context/AuthContext'
 import useQuery from '../hooks/useQuery'
-import { getContestById } from '../services/contestService'
+import { contestDeadlineEnd, getContestById, isContestOpen } from '../services/contestService'
 import { getMyLeaderApplication } from '../services/leaderService'
 import { getEnrichedTeams } from '../services/teamService'
 import { formatDate, safeHttpUrl } from '../utils/display'
@@ -27,9 +27,10 @@ export default function ContestDetailScreen() {
       getEnrichedTeams(),
       member?.id ? getMyLeaderApplication(member.id, id).catch(() => null) : Promise.resolve(null),
     ])
-    const contestTeams = allTeams.filter((team) => String(team.contest_id) === String(id))
+    const isVisibleContest = contest?.is_active !== false && isContestOpen(contest)
+    const contestTeams = isVisibleContest ? allTeams.filter((team) => String(team.contest_id) === String(id)) : []
     return {
-      contest,
+      contest: isVisibleContest ? contest : null,
       teams: contestTeams.filter((team) => team.status === 'recruiting'),
       allTeams: contestTeams,
       leaderApplication,
@@ -38,7 +39,7 @@ export default function ContestDetailScreen() {
 
   if (q.loading) return <LoadingState />
   if (q.error) return <ErrorState error={q.error} retry={q.retry} />
-  if (!q.data.contest || !q.data.contest.is_active) return <EmptyState title="공모전을 찾을 수 없어요" />
+  if (!q.data.contest) return <EmptyState title="공모전을 찾을 수 없어요" description="접수 마감 또는 비공개 처리된 공모전입니다." />
 
   const contest = q.data.contest
   const dday = getDday(contest.registration_deadline)
@@ -155,8 +156,8 @@ function InfoRow({ icon: Icon, label, value }) {
 
 function getDday(value) {
   if (!value) return '마감일 미정'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '마감일 미정'
-  const diff = Math.ceil((date.setHours(23, 59, 59, 999) - Date.now()) / 86400000)
+  const date = contestDeadlineEnd(value)
+  if (!date || Number.isNaN(date.getTime())) return '마감일 미정'
+  const diff = Math.ceil((date.getTime() - Date.now()) / 86400000)
   return diff >= 0 ? `D-${diff}` : '접수 마감'
 }

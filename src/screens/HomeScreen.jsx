@@ -63,6 +63,7 @@ export default function HomeScreen() {
     ['/attendance', CalendarDays, '출석', '모임 일정과 출석 체크', 'blue'],
     ['/contests', Trophy, '공모전', '공모전 메인으로 이동', 'violet'],
   ]
+  const firstAdminSection = ADMIN_SECTIONS.find((s) => adminSections.includes(s.key))
 
   return <div className="mast-home">
     {(warning || data.unavailable?.length > 0) && <div className="partial-data-notice">DB 조회가 지연되거나 일부 테이블 권한이 막혀 기본 화면을 표시 중입니다.</div>}
@@ -76,20 +77,6 @@ export default function HomeScreen() {
       </div>
     </section>
 
-    {isExecOperator && <section className="mast-admin-access">
-      <div className="mast-section-heading"><h2>관리자 기능</h2><Link to="/admin">관리자 콘솔 <ChevronRight /></Link></div>
-      <div className="mast-quick-grid">
-        {ADMIN_SECTIONS.filter((s) => adminSections.includes(s.key)).map((s) => {
-          const Icon = s.Icon
-          return <Link to={s.to} className="mast-quick-card" key={s.key}>
-            <span className="mast-quick-icon violet"><Icon /></span>
-            <div><h2>{s.label}</h2><p>임원진 관리 기능</p></div>
-            <ChevronRight />
-          </Link>
-        })}
-      </div>
-    </section>}
-
     {data.announcements[0] && <Link to="/announcements" className="mast-home-notice-banner">
       <Bell />
       <span>공지</span>
@@ -97,9 +84,8 @@ export default function HomeScreen() {
       <ChevronRight />
     </Link>}
 
-    <section className="home-todo-card">
+    {todoItems.length > 0 && <section className="home-todo-card">
       <div className="mast-section-heading"><h2>오늘 할 일</h2><span className="todo-count">{todoItems.length}</span></div>
-      {!todoItems.length && <div className="todo-empty">지금 처리할 일이 없어요. 새로운 출석 모임이나 홍보 미션이 생기면 여기에 표시됩니다.</div>}
       {todoItems.map((item) => {
         const Icon = item.icon
         return <Link to={item.to} className={`todo-row ${item.className}`} key={item.key}>
@@ -108,9 +94,7 @@ export default function HomeScreen() {
           <em>{item.action}</em>
         </Link>
       })}
-    </section>
-
-    <HomeWeather query={weatherQuery} />
+    </section>}
 
     <section className="mast-quick-grid">
       {quick.map(([to, Icon, title, sub, color]) => <Link to={to} className="mast-quick-card" aria-label={`${title} 바로가기`} key={title}>
@@ -119,6 +103,8 @@ export default function HomeScreen() {
         <ChevronRight />
       </Link>)}
     </section>
+
+    <HomeWeather query={weatherQuery} />
 
     <section className="mast-status">
       <div className="mast-section-heading"><h2>주요 현황</h2><Link to="/my/teams">전체보기 <ChevronRight /></Link></div>
@@ -136,6 +122,20 @@ export default function HomeScreen() {
     </section>
 
     <section className="mast-notice"><Bell /><b>공지사항</b><span>{data.announcements[0] ? titleOf(data.announcements[0]) : '등록된 공지가 없습니다.'}</span><ChevronRight /></section>
+
+    {isExecOperator && <section className="mast-admin-access">
+      <div className="mast-section-heading"><h2>관리자 기능</h2><Link to={firstAdminSection?.to || '/'}>관리자 기능 <ChevronRight /></Link></div>
+      <div className="mast-quick-grid">
+        {ADMIN_SECTIONS.filter((s) => adminSections.includes(s.key)).map((s) => {
+          const Icon = s.Icon
+          return <Link to={s.to} className="mast-quick-card" key={s.key}>
+            <span className="mast-quick-icon violet"><Icon /></span>
+            <div><h2>{s.label}</h2><p>허용된 관리자 기능</p></div>
+            <ChevronRight />
+          </Link>
+        })}
+      </div>
+    </section>}
   </div>
 }
 

@@ -9,6 +9,14 @@ import { ACTIVITY_WEATHER_PRESETS, SCORE_RUBRIC, WEATHER_BASE_SCORE, gradeFor } 
 
 const GAINS = SCORE_RUBRIC.filter((item) => item.group === 'gain')
 const DEDUCTS = SCORE_RUBRIC.filter((item) => item.group === 'deduct')
+const AUTOMATIC_SCORE_ITEMS = [
+  { label: 'OT 정참', points: 5 },
+  { label: 'OT 지각', points: '-1/-3' },
+  { label: 'OT 결석', points: -10 },
+  { label: '공모전 팀 참여', points: 1 },
+  { label: '동료평가 항목 1위', points: 1 },
+  { label: '에타 미참여', points: -2 },
+]
 
 export default function ActivityWeatherScreen() {
   const { member } = useAuth()
@@ -97,7 +105,30 @@ export default function ActivityWeatherScreen() {
           </ul>
         </div>
       </div>
-      <p className="score-guide-note">실제 반영 내역은 운영진이 관리하며, 위 항목 기준으로 가산·감점됩니다.</p>
+      <div className="score-guide-col auto">
+        <h3>자동 반영 항목</h3>
+        <ul>
+          {AUTOMATIC_SCORE_ITEMS.map((it) => <li key={it.label}><span>{it.label}</span><em>{formatPoints(it.points)}</em></li>)}
+        </ul>
+      </div>
+      <p className="score-guide-note">수동 항목은 운영진이 관리하고, 자동 항목은 출석·홍보·팀 참여·동료평가 기록에 따라 반영됩니다.</p>
+    </section>}
+
+    {!exempt && <section className="weather-breakdown">
+      <div className="section-heading">
+        <h2>내 점수 반영 내역</h2>
+        <span>{d.events?.length ?? 0}건</span>
+      </div>
+      <div className="score-ledger">
+        <div className="score-ledger-row base"><b>시작 점수</b><em>{base}</em></div>
+        {(d.events ?? []).length
+          ? d.events.map((event) => <div className="score-ledger-row" key={event.id || `${event.key}-${event.label}`}>
+            <b>{event.label}{event.auto && <small>자동 반영</small>}</b>
+            <em className={event.points >= 0 ? 'up' : 'down'}>{event.points >= 0 ? '+' : ''}{event.points}</em>
+          </div>)
+          : <div className="score-ledger-empty">아직 반영된 가감점이 없습니다.</div>}
+        <div className="score-ledger-row total"><b>현재 점수</b><em>{score}<small>/100</small></em></div>
+      </div>
     </section>}
 
     {!exempt && <div className="weather-tip">
@@ -147,4 +178,9 @@ function makePreviewWeather(preset) {
     totalDelta: score - WEATHER_BASE_SCORE,
     events: [{ id: 'preview', label: '프리뷰 가감점', points: score - WEATHER_BASE_SCORE }],
   }
+}
+
+function formatPoints(points) {
+  if (typeof points === 'string') return points
+  return points > 0 ? `+${points}` : String(points)
 }

@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
   const isFullAdmin = ['admin', 'manager', 'professor'].includes(member?.role)
   const isProfessor = member?.role === 'professor'
   const adminSections = normalizeSections(member?.admin_sections)
-  // 임원진(직책별 권한): 전체 관리자는 아니지만 일부 섹션 권한을 가진 회원
+  // 직책별 권한: 전체 관리자는 아니지만 일부 섹션 권한을 가진 회원
   const isExecOperator = !isFullAdmin && adminSections.length > 0
   const canAccessAdmin = isFullAdmin || isExecOperator
   const value = useMemo(() => ({

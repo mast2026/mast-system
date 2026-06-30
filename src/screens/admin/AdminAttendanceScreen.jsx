@@ -6,6 +6,7 @@ import Modal from '../../components/Modal'
 import { Field, FormActions } from '../../components/FormControls'
 import { EmptyState, ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
+import { useAuth } from '../../context/AuthContext'
 import { attendanceStatusLabel } from '../../services/attendanceService'
 import { notifyAttendanceOpen } from '../../services/notificationService'
 import {
@@ -26,6 +27,7 @@ const tabs = [
 ]
 
 export default function AdminAttendanceScreen() {
+  const { isFullAdmin } = useAuth()
   const [params, setParams] = useSearchParams()
   const tab = params.get('tab') || 'sessions'
   const [creating, setCreating] = useState(false)
@@ -176,6 +178,8 @@ export default function AdminAttendanceScreen() {
 
   if (q.loading) return <LoadingState label="출석 관리자 데이터를 불러오는 중" />
   if (q.error) return <ErrorState error={q.error} retry={q.retry} />
+  const mainHref = isFullAdmin ? '/admin' : '/'
+  const mainLabel = isFullAdmin ? '관리자 메인' : '회원 메인'
 
   return <div className="admin-attendance-page">
     {notice && <div className="form-notice">{notice}</div>}
@@ -184,7 +188,7 @@ export default function AdminAttendanceScreen() {
     </div>}
 
     <nav className="admin-inner-tabs admin-management-tabs admin-attendance-tabs" aria-label="출석 관리 메뉴">
-      <Link className="admin-icon-button mini" to="/admin" aria-label="관리자 메인"><Home /></Link>
+      <Link className="admin-icon-button mini" to={mainHref} aria-label={mainLabel}><Home /></Link>
       {tabs.map(([key, Icon, label]) => (
         <button key={key} className={tab === key ? 'active' : ''} type="button" onClick={() => setTab(key)}>
           <Icon /><span>{label}</span>

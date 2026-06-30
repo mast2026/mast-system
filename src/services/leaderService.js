@@ -1,5 +1,5 @@
 import { TABLES, requireSupabase, throwIfError } from './baseService'
-import { notifyAdmins } from './notificationService'
+import { notifyAdmins, sendOneSignalPush } from './notificationService'
 
 const CONTEST_MARKER = '[contest_id]'
 const TEAM_DRAFT_MARKER = '[team_post_draft]'
@@ -122,7 +122,7 @@ export async function applyForLeader(memberId, contestId, message) {
   const { data, error } = await requireSupabase().from(TABLES.leaderApplications).insert(payload).select('*').single()
   throwIfError(error)
   // 공모전 팀장 신청 도착 → 관리자에게 알림
-  notifyAdmins({ title: '공모전 팀장 신청 도착', body: '새 공모전 팀장(팀 공고 작성) 신청이 들어왔어요.', href: '/admin/contest?tab=leader-applications' })
+  notifyAdmins({ title: '공모전 팀장 신청 도착', body: '새 공모전 팀장(팀 공고 작성) 신청이 들어왔어요.', href: '/admin/contest?tab=leader-applications', section: 'contest' })
   return normalizeApplication(data)
 }
 
@@ -183,19 +183,23 @@ export async function decideLeaderApplication(applicationId, status) {
     const { data: contest } = await client.from(TABLES.contests).select('title').eq('id', normalized.contest_id).maybeSingle()
     if (contest?.title) contestTitle = contest.title
   }
+  const title = status === 'accepted' ? '공모전 팀장 신청이 승인되었습니다.' : '공모전 팀장 신청 결과를 확인해 주세요.'
+  const body = status === 'accepted'
+    ? `${contestTitle} 모집공고가 자동으로 등록되었습니다. 내 팀에서 확인하세요.`
+    : `${contestTitle} 팀장 신청이 승인되지 않았습니다. 내용을 보완해 다시 신청할 수 있습니다.`
+  const href = status === 'accepted' && normalized.contest_id
+    ? '/my/teams'
+    : normalized.contest_id
+      ? `/leader-application?contest=${normalized.contest_id}`
+      : '/leader-application'
   await client.from(TABLES.notifications).insert({
     member_id: application.member_id,
     type: 'leader_application_result',
-    title: status === 'accepted' ? '공모전 팀장 신청이 승인되었습니다.' : '공모전 팀장 신청 결과를 확인해 주세요.',
-    body: status === 'accepted'
-      ? `${contestTitle} 모집공고가 자동으로 등록되었습니다. 내 팀에서 확인하세요.`
-      : `${contestTitle} 팀장 신청이 승인되지 않았습니다. 내용을 보완해 다시 신청할 수 있습니다.`,
-    href: status === 'accepted' && normalized.contest_id
-      ? '/my/teams'
-      : normalized.contest_id
-        ? `/leader-application?contest=${normalized.contest_id}`
-        : '/leader-application',
+    title,
+    body,
+    href,
   })
+  await sendOneSignalPush({ memberIds: [application.member_id], title, body, url: href })
 }
 
 async function createTeamFromLeaderApplication(client, application) {

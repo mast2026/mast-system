@@ -35,11 +35,20 @@ export default function AdminTeamsScreen() {
       columns={[
         { key: 'contest', label: '공모전', render: (row) => row.contest?.title || '-' },
         { key: 'leader', label: '팀장', render: (row) => row.leader?.name || '-' },
-        { key: 'members', label: '인원', render: (row) => `${row.current_members ?? row.members?.length ?? 0}/${row.required_members ?? '-'}` },
+        { key: 'members', label: '전체 인원', render: (row) => `${teamTotalMembers(row)}/${row.required_members ?? '-'}` },
         { key: 'status', label: '상태', render: (row) => <select className="table-select" value={row.status === 'recruiting' ? 'recruiting' : 'matched'} onChange={(event) => updateStatus(row, event.target.value)}>{statuses.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select> },
         { key: 'open_chat_url', label: '오픈채팅', render: (row) => row.hasOpenChat ? '등록' : '미등록' },
         { key: 'note', label: '관리 위치', render: () => <Badge value="팀매칭 관리에서 상세 확인" /> },
         { key: 'delete', label: '삭제', render: (row) => <button className="table-button danger" type="button" onClick={() => removeTeam(row)}><Trash2 />삭제</button> },
       ]} />
   </>
+}
+
+function teamTotalMembers(team) {
+  const ids = new Set()
+  if (team?.leader_id) ids.add(Number(team.leader_id))
+  ;(team?.members ?? []).forEach((link) => {
+    if (!link.status || link.status === 'active') ids.add(Number(link.member_id))
+  })
+  return Math.max(1, ids.size || Number(team?.current_members ?? 0))
 }

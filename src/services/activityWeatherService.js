@@ -5,7 +5,7 @@ import { findAttendanceMember } from './attendanceService'
 // 아래 타입은 저장 점수가 아니라 기록에서 실시간 계산합니다(합산에서 제외해 중복/잔존 방지).
 //  - 출석 점수(attendance, 구버전 ot_late 등): 출석 기록에서 계산
 //  - 에타 미참여(eta_miss): 마감 지난 홍보 미션 미제출에서 계산
-const DERIVED_EVENT_TYPES = ['attendance', 'attendance_late', 'ot_late', 'ot_late_30', 'eta_miss']
+const DERIVED_EVENT_TYPES = ['attendance', 'attendance_late', 'ot_late', 'ot_late_30', 'eta_miss', 'contest_join']
 const SUBMITTED_PROMO = ['submitted', 'approved', 'late']
 
 // 마감이 지난 홍보 미션 중 미제출 건 → '에타 미참여 -2'
@@ -17,7 +17,7 @@ function promotionMissItems(assignments, missionById, now) {
     const due = m.due_at ? new Date(m.due_at).getTime() : null
     if (due == null || now < due) continue // 아직 마감 전
     if (SUBMITTED_PROMO.includes(String(a.status ?? '').toLowerCase())) continue // 제출/승인/지각완료 제외
-    items.push({ id: `promo-${a.id}`, event_type: 'eta_miss', points: -2, metadata: { reason: `${m.title || '에타 미션'} 미참여` } })
+    items.push({ id: `promo-${a.id}`, event_type: 'eta_miss', points: -2, metadata: { reason: `${m.title || '에타 미션'} 미참여`, auto: true } })
   }
   return items
 }
@@ -53,14 +53,36 @@ function attendanceItemsFromRecords(records, sessionById) {
     if (status === 'late') {
       const pts = Number(r.points)
       const points = Number.isFinite(pts) && pts < 0 ? pts : -1
-      items.push({ id: `att-${r.id}`, event_type: 'attendance', points, metadata: { reason: `${title} 지각` } })
+      items.push({ id: `att-${r.id}`, event_type: 'attendance', points, metadata: { reason: `${title} 지각`, auto: true } })
     } else if (status === 'present') {
-      items.push({ id: `att-${r.id}`, event_type: 'attendance', points: 5, metadata: { reason: `${title} 정참` } })
+      items.push({ id: `att-${r.id}`, event_type: 'attendance', points: 5, metadata: { reason: `${title} 정참`, auto: true } })
     } else if (status === 'absent') {
-      items.push({ id: `att-${r.id}`, event_type: 'attendance', points: -10, metadata: { reason: `${title} 결석` } })
+      items.push({ id: `att-${r.id}`, event_type: 'attendance', points: -10, metadata: { reason: `${title} 결석`, auto: true } })
     }
   }
   return items
+}
+
+function isActiveTeamLink(link) {
+  return !Object.prototype.hasOwnProperty.call(link, 'status') || ['active', 'accepted'].includes(String(link.status || 'active'))
+}
+
+function contestJoinItemsForMember(memberId, teams = [], teamMembers = [], contestById = new Map()) {
+  const activeTeamIds = new Set((teamMembers ?? [])
+    .filter((link) => Number(link.member_id) === Number(memberId) && isActiveTeamLink(link))
+    .map((link) => Number(link.team_id)))
+  return (teams ?? [])
+    .filter((team) => Number(team.leader_id) === Number(memberId) || activeTeamIds.has(Number(team.id)))
+    .map((team) => {
+      const contest = contestById.get(Number(team.contest_id))
+      const title = contest?.title || team.introduction || `공모전 팀 #${team.id}`
+      return {
+        id: `contest-${team.id}`,
+        event_type: 'contest_join',
+        points: 1,
+        metadata: { reason: `${title} 참여`, team_id: team.id, contest_id: team.contest_id, auto: true },
+      }
+    })
 }
 export { calculateActivityWeather, calculateWeatherFromEvents, gradeFor, weatherFor } from '../utils/activityWeather'
 // eslint-disable-next-line no-unused-vars
@@ -261,15 +283,20 @@ export async function getMemberActivityWeather(member) {
   const memberId = member?.id ?? member  // 하위 호환
 
   // 70점 시작 + 관리자 가감점 + 출석(실시간) + 에타 미참여(마감 후 실시간)
-  const [eventRes, legacyMember, sessionRes, missionRes] = await Promise.all([
+  const [eventRes, legacyMember, sessionRes, missionRes, teamRes, teamMemberRes, contestRes] = await Promise.all([
     supabase.from(TABLES.scoreEvents).select('*').eq('member_id', memberId).eq('verified', true),
     findAttendanceMember(member).catch(() => null),
     supabase.from('activity_sessions').select('id,title,is_orientation'),
     supabase.from('promotion_missions').select('id,title,due_at'),
+    supabase.from(TABLES.teams).select('id,contest_id,leader_id,introduction,status'),
+    supabase.from(TABLES.teamMembers).select('id,team_id,member_id,status'),
+    supabase.from(TABLES.contests).select('id,title'),
   ])
   const manual = (eventRes.data ?? []).filter((e) => !DERIVED_EVENT_TYPES.includes(e.event_type))
   let attendanceItems = []
   let promoItems = []
+  const contestById = new Map((contestRes.data ?? []).map((contest) => [Number(contest.id), contest]))
+  const contestItems = contestJoinItemsForMember(memberId, teamRes.data ?? [], teamMemberRes.data ?? [], contestById)
   if (legacyMember) {
     const [recRes, promoRes] = await Promise.all([
       supabase.from('activity_attendance_records').select('*').eq('member_id', legacyMember.id),
@@ -282,8 +309,8 @@ export async function getMemberActivityWeather(member) {
   }
 
   return {
-    ...calculateWeatherFromEvents([...manual, ...attendanceItems, ...promoItems]),
-    raw: { scoreEvents: eventRes.data ?? [], attendanceItems, promoItems },
+    ...calculateWeatherFromEvents([...manual, ...attendanceItems, ...promoItems, ...contestItems]),
+    raw: { scoreEvents: eventRes.data ?? [], attendanceItems, promoItems, contestItems },
   }
 }
 
@@ -293,13 +320,16 @@ export async function getMemberActivityWeather(member) {
  */
 export async function getAllActivityWeather(members) {
   const supabase = requireSupabase()
-  const [eventRes, recRes, sessionRes, legacyRes, promoAssignRes, missionRes] = await Promise.all([
+  const [eventRes, recRes, sessionRes, legacyRes, promoAssignRes, missionRes, teamRes, teamMemberRes, contestRes] = await Promise.all([
     supabase.from(TABLES.scoreEvents).select('*').eq('verified', true),
     supabase.from('activity_attendance_records').select('*'),
     supabase.from('activity_sessions').select('id,title,is_orientation'),
     supabase.from('members').select('*'),
     supabase.from('promotion_mission_assignments').select('id,mission_id,member_id,status'),
     supabase.from('promotion_missions').select('id,title,due_at'),
+    supabase.from(TABLES.teams).select('id,contest_id,leader_id,introduction,status'),
+    supabase.from(TABLES.teamMembers).select('id,team_id,member_id,status'),
+    supabase.from(TABLES.contests).select('id,title'),
   ])
   const allEvents = eventRes.data ?? []
   const allRecords = recRes.data ?? []
@@ -307,6 +337,9 @@ export async function getAllActivityWeather(members) {
   const allPromo = promoAssignRes.data ?? []
   const sessionById = new Map((sessionRes.data ?? []).map((s) => [String(s.id), s]))
   const missionById = new Map((missionRes.data ?? []).map((m) => [String(m.id), m]))
+  const contestById = new Map((contestRes.data ?? []).map((contest) => [Number(contest.id), contest]))
+  const teams = teamRes.data ?? []
+  const teamMembers = teamMemberRes.data ?? []
   const now = Date.now()
 
   return members.map((member) => {
@@ -321,10 +354,11 @@ export async function getAllActivityWeather(members) {
     const promos = legacy ? allPromo.filter((a) => String(a.member_id) === String(legacy.id)) : []
     const attendanceItems = attendanceItemsFromRecords(recs, sessionById)
     const promoItems = promotionMissItems(promos, missionById, now)
+    const contestItems = contestJoinItemsForMember(member.id, teams, teamMembers, contestById)
     return {
       ...member,
-      activityWeather: calculateWeatherFromEvents([...manual, ...attendanceItems, ...promoItems]),
-      raw: { scoreEvents: manual, attendanceItems, promoItems },
+      activityWeather: calculateWeatherFromEvents([...manual, ...attendanceItems, ...promoItems, ...contestItems]),
+      raw: { scoreEvents: manual, attendanceItems, promoItems, contestItems },
     }
   })
 }
