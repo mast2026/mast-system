@@ -16,22 +16,25 @@ export async function getAdminDashboardData() {
     getAdminAttendanceOverview().catch(() => emptyAdminOverview()),
     getAdminPromotionOverview().catch(() => emptyAdminOverview()),
   ])
+  // 오늘(KST) 날짜와 오늘 미션의 배정만 추림 — 홍보 미제출/승인대기는 '오늘 미션' 기준
+  const todayStr = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+  const todayMissionIds = new Set((promotion.missions ?? []).filter((m) => String(m.mission_date) === todayStr).map((m) => String(m.id)))
+  const todayAssignments = (promotion.assignments ?? []).filter((a) => String(a.mission_date) === todayStr || todayMissionIds.has(String(a.mission_id)))
+  // 아직 모집 중인(확정 전) 팀만 — 팀확정 완료된 팀의 대기 지원은 제외
+  const recruitingTeamIds = new Set(teams.filter((t) => String(t.status) === 'recruiting').map((t) => Number(t.id)))
   return {
     stats: {
       members: members.length,
       activeContests: contests.filter((item) => item.is_active).length,
       recruitingTeams: teams.filter((item) => item.status === 'recruiting').length,
       pendingLeaderApplications: leaderApplications.filter((item) => item.status === 'pending').length,
-      pendingApplications: applications.filter((item) => item.status === 'pending').length,
+      pendingApplications: applications.filter((item) => item.status === 'pending' && recruitingTeamIds.has(Number(item.team_id))).length,
       activityWeatherMembers: weatherRows.length,
       attendanceOpenSessions: attendance.sessions.filter((item) => ['open', 'scheduled'].includes(String(item.status ?? 'scheduled'))).length,
       attendanceUnchecked: Math.max(0, Number(attendance.members.length || 0) - Number(attendance.records.filter((row) => row.status === 'present').length || 0)),
-      promotionPending: promotion.assignments.filter((item) => ['submitted', 'pending_review'].includes(String(item.status ?? ''))).length,
-      promotionMissing: promotion.assignments.filter((item) => ['pending', 'missed', 'rejected'].includes(String(item.status ?? 'pending'))).length,
-      hasTodayPromotionMission: (() => {
-        const todayStr = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
-        return (promotion.missions ?? []).some((m) => String(m.mission_date) === todayStr)
-      })(),
+      promotionPending: todayAssignments.filter((item) => ['submitted', 'pending_review'].includes(String(item.status ?? ''))).length,
+      promotionMissing: todayAssignments.filter((item) => ['pending', 'missed', 'rejected'].includes(String(item.status ?? 'pending'))).length,
+      hasTodayPromotionMission: todayMissionIds.size > 0,
     },
     recentContests: sortDesc(contests).slice(0, 5),
     recentTeams: sortDesc(teams).slice(0, 5),
@@ -374,8 +377,33 @@ export async function getMemberPositions() {
   }
 }
 
+// 임원진 직책별 관리자 권한(admin_sections) 을 안전하게 읽어옵니다. (컬럼 없으면 빈 맵)
+export async function getMemberAdminSections() {
+  try {
+    const { data, error } = await requireSupabase().from(TABLES.members).select('id,admin_sections')
+    if (error) return {}
+    const map = {}
+    ;(data ?? []).forEach((row) => {
+      let v = row.admin_sections
+      if (typeof v === 'string') { try { v = JSON.parse(v) } catch { v = [] } }
+      map[row.id] = Array.isArray(v) ? v : []
+    })
+    return map
+  } catch {
+    return {}
+  }
+}
+
 export async function updateMemberAdminFields(memberId, patch) {
-  const { data, error } = await requireSupabase().from(TABLES.members).update(clean(patch)).eq('id', memberId).select('*').maybeSingle()
+  const cleaned = clean(patch)
+  const { data, error } = await requireSupabase().from(TABLES.members).update(cleaned).eq('id', memberId).select('*').maybeSingle()
+  // admin_sections 컬럼이 아직 없으면, 그 항목만 빼고 나머지는 정상 저장 (오류는 호출부에 알림)
+  if (error && /admin_sections/.test(String(error.message)) && 'admin_sections' in cleaned) {
+    const { admin_sections, ...rest } = cleaned
+    const retry = await requireSupabase().from(TABLES.members).update(rest).eq('id', memberId).select('*').maybeSingle()
+    throwIfError(retry.error)
+    throw new Error('admin_sections 컬럼이 없어 권한은 저장되지 못했습니다. add-admin-sections.sql 을 실행해 주세요.')
+  }
   throwIfError(error)
   return data
 }

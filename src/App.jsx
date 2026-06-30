@@ -55,21 +55,22 @@ function AdminRoute() {
 }
 
 function LoginEntry() {
-  const { member, canAccessAdmin } = useAuth() || {}
+  const { member, isFullAdmin } = useAuth() || {}
   if (!member) return <LoginScreen />
-  return <Navigate to={canAccessAdmin ? '/admin' : '/'} replace />
+  return <Navigate to={isFullAdmin ? '/admin' : '/'} replace />
 }
 
 function AdminLoginEntry() {
-  const { member, canAccessAdmin } = useAuth() || {}
+  const { member, isFullAdmin } = useAuth() || {}
   if (!member) return <AdminLoginScreen />
-  return <Navigate to={canAccessAdmin ? '/admin' : '/'} replace />
+  return <Navigate to={isFullAdmin ? '/admin' : '/'} replace />
 }
 
-// 루트("/") 진입 시 관리자(운영진/지도교수)는 관리자 콘솔로 보냅니다.
+// 루트("/") 진입 시 전체 관리자(운영진/지도교수)만 관리자 콘솔로 보냅니다.
+// 임원진(직책별 권한)은 회원 홈을 그대로 쓰고, 홈에서 허용된 관리자 기능으로 들어갑니다.
 function HomeEntry() {
-  const { canAccessAdmin } = useAuth() || {}
-  return canAccessAdmin ? <Navigate to="/admin" replace /> : <HomeScreen />
+  const { isFullAdmin } = useAuth() || {}
+  return isFullAdmin ? <Navigate to="/admin" replace /> : <HomeScreen />
 }
 
 // 관리자(/admin) 화면에선 관리자용 매니페스트로 바꿔, 홈 화면 추가 시 별도 앱으로 설치되게 함

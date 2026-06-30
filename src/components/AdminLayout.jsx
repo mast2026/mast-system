@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Award, Bell, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ClipboardList, CloudSun, FileText, Home, LayoutDashboard, LogOut, Megaphone, MessageSquareText, ShieldCheck, Trophy, Users } from 'lucide-react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { canAccessAdminPath, sectionKeyForPath } from '../utils/adminSections'
 import BrandLogo from './BrandLogo'
 const adminNavGroups = [
   { label: '홈', items: [['/admin', LayoutDashboard, '대시보드']] },
@@ -11,11 +12,16 @@ const adminNavGroups = [
   { label: '평가/성과', items: [['/admin/activity-weather', CloudSun, '활동날씨'], ['/admin/peer-reviews', MessageSquareText, '동료평가'], ['/admin/awards', Award, '수상 관리']] },
 ]
 export default function AdminLayout() {
-  const { member, logout } = useAuth(); const navigate = useNavigate(); const location = useLocation()
+  const { member, logout, isFullAdmin, adminSections } = useAuth(); const navigate = useNavigate(); const location = useLocation()
+  // 직책별 권한: 임원진은 허용된 섹션 메뉴만 보이고, 그 외 경로는 대시보드로 되돌립니다.
+  const allowPath = (to) => isFullAdmin || to === '/admin' || (adminSections || []).includes(sectionKeyForPath(to))
+  const visibleGroups = adminNavGroups
+    .map((group) => ({ ...group, items: group.items.filter(([to]) => allowPath(to)) }))
+    .filter((group) => group.items.length)
   const [topCollapsed, setTopCollapsed] = useState(() => localStorage.getItem('mast_admin_top_expanded') !== 'true')
   const [sideCollapsed, setSideCollapsed] = useState(() => localStorage.getItem('mast_admin_side_collapsed') === 'true')
   const isPromotionAdmin = location.pathname.startsWith('/admin/promotion')
-  const roleLabel = member?.role === 'professor' ? '교수' : '관리자'
+  const roleLabel = member?.role === 'professor' ? '교수' : (!isFullAdmin && member?.position_title) ? member.position_title : '관리자'
   const toggleTop = () => {
     const next = !topCollapsed; setTopCollapsed(next)
     localStorage.setItem('mast_admin_top_expanded', String(!next))
@@ -25,6 +31,8 @@ export default function AdminLayout() {
     localStorage.setItem('mast_admin_side_collapsed', String(next))
   }
   useEffect(() => { if (localStorage.getItem('mast_admin_top_expanded') === null) setTopCollapsed(true) }, [])
+  // 권한 없는 섹션 직접 진입 차단 (임원진)
+  if (!canAccessAdminPath(adminSections, location.pathname, isFullAdmin)) return <Navigate to="/admin" replace />
   if (isPromotionAdmin) {
     return <main className="admin-promotion-standalone"><Outlet /></main>
   }
@@ -36,7 +44,7 @@ export default function AdminLayout() {
       </div>}
       {sideCollapsed && <div className="admin-brand admin-brand-mini"><BrandLogo size="admin" light/></div>}
       <nav className="admin-nav">
-        {adminNavGroups.map((group) => <section key={group.label}>
+        {visibleGroups.map((group) => <section key={group.label}>
           {!sideCollapsed && <p>{group.label}</p>}
           {group.items.map(([to, Icon, label]) => (
             <NavLink key={to} to={to} end={to === '/admin'} title={sideCollapsed ? label : undefined}>

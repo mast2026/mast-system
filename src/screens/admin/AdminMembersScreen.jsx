@@ -6,8 +6,9 @@ import Modal from '../../components/Modal'
 import { Field, FormActions } from '../../components/FormControls'
 import { ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
-import { createScoreEvent, deleteAdminMember, deleteScoreEvent, getAdminMemberStatsRows, getMemberPositions, updateMemberAdminFields, updateScoreEvent } from '../../services/adminService'
+import { createScoreEvent, deleteAdminMember, deleteScoreEvent, getAdminMemberStatsRows, getMemberAdminSections, getMemberPositions, updateMemberAdminFields, updateScoreEvent } from '../../services/adminService'
 import { SCORE_RUBRIC } from '../../utils/activityWeather'
+import { ADMIN_SECTIONS, normalizeSections } from '../../utils/adminSections'
 
 const GAINS = SCORE_RUBRIC.filter((item) => item.group === 'gain')
 const DEDUCTS = SCORE_RUBRIC.filter((item) => item.group === 'deduct')
@@ -21,8 +22,8 @@ const roleLabels = {
 
 export default function AdminMembersScreen() {
   const q = useQuery(async () => {
-    const [rows, positions] = await Promise.all([getAdminMemberStatsRows(), getMemberPositions()])
-    return rows.map((row) => ({ ...row, position_title: positions[row.id] ?? row.position_title ?? null }))
+    const [rows, positions, sectionMap] = await Promise.all([getAdminMemberStatsRows(), getMemberPositions(), getMemberAdminSections()])
+    return rows.map((row) => ({ ...row, position_title: positions[row.id] ?? row.position_title ?? null, admin_sections: sectionMap[row.id] ?? row.admin_sections ?? [] }))
   }, [])
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
@@ -154,6 +155,8 @@ function MemberDetailModal({ member, onClose, onSaved, onScoreChanged }) {
     const t = String(member.position_title || '').trim()
     return ['지도교수', '고문'].includes(t) ? '' : t
   })
+  const [sections, setSections] = useState(() => normalizeSections(member.admin_sections))
+  const toggleSection = (key) => setSections((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -170,10 +173,14 @@ function MemberDetailModal({ member, onClose, onSaved, onScoreChanged }) {
       // status 는 team_matching_members 에 컬럼이 없어 저장하지 않습니다.
       const titleByType = { member: null, exec: positionTitle.trim(), professor: '지도교수', advisor: '고문' }
       const nextTitle = titleByType[memberType] ?? null
-      await updateMemberAdminFields(member.id, { name, school, major, generation, position_title: nextTitle })
+      // 임원진일 때만 직책별 관리자 권한 저장, 그 외에는 권한 회수([])
+      const nextSections = memberType === 'exec' ? sections : []
+      await updateMemberAdminFields(member.id, { name, school, major, generation, position_title: nextTitle, admin_sections: nextSections })
       onSaved('회원 정보를 저장했습니다.')
     } catch (err) {
-      const message = /position_title/.test(String(err.message))
+      const message = /admin_sections/.test(String(err.message))
+        ? '임원진 권한 저장에 실패했습니다. Supabase에서 add-admin-sections.sql 을 실행해 admin_sections 컬럼을 추가해 주세요.'
+        : /position_title/.test(String(err.message))
         ? '임원진 직책 저장에 실패했습니다. Supabase에서 add-position-title.sql 을 실행해 position_title 컬럼을 추가해 주세요.'
         : err.message
       setError(message)
@@ -286,7 +293,18 @@ function MemberDetailModal({ member, onClose, onSaved, onScoreChanged }) {
         {memberType === 'exec' && <Field label="임원진 직책명">
           <input value={positionTitle} onChange={(event) => setPositionTitle(event.target.value)} placeholder="예: 회장, 부회장, 총무" />
         </Field>}
-        <div className="admin-role-note"><ShieldCheck /> 지정한 직책이 회원 정보와 프로필 아바타 테두리에 함께 표시됩니다. 지도교수·고문은 파란색, 임원진은 노랑·하늘색 테두리예요. 관리자 로그인 권한은 별도이며 이 설정으로 바뀌지 않습니다.</div>
+        {memberType === 'exec' && <Field label="관리자 권한 (직책별 기능 제한)">
+          <div className="admin-section-perms">
+            {ADMIN_SECTIONS.map((s) => {
+              const on = sections.includes(s.key)
+              return <button type="button" key={s.key} className={`admin-section-chip${on ? ' on' : ''}`} onClick={() => toggleSection(s.key)}>
+                {on && <Check size={13} />}{s.label}
+              </button>
+            })}
+          </div>
+          <small className="admin-section-perms-hint">체크한 기능만 이 임원진의 회원 홈·관리자 콘솔에 표시됩니다. 비워두면 관리자 기능 없이 직책만 부여됩니다.</small>
+        </Field>}
+        <div className="admin-role-note"><ShieldCheck /> 임원진은 회원 로그인 그대로 두고, 체크한 관리자 기능만 회원 홈과 관리자 콘솔에서 사용할 수 있어요. 지도교수·고문은 파란색, 임원진은 노랑·하늘색 테두리로 표시됩니다.</div>
         {error && <div className="form-error">{error}</div>}
         <FormActions submitting={busy} submitLabel="회원 정보 저장" onCancel={onClose} />
         <button className="button danger admin-delete-member-button" type="button" onClick={remove} disabled={busy}>

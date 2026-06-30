@@ -11,9 +11,10 @@ import { getMemberActivityWeather } from '../services/activityWeatherService'
 import { getPromotionDashboard, isPromotionSubmitted } from '../services/promotionService'
 import { getActiveAttendanceSessions } from '../services/attendanceService'
 import { formatDate, titleOf } from '../utils/display'
+import { ADMIN_SECTIONS } from '../utils/adminSections'
 
 export default function HomeScreen() {
-  const { member } = useAuth()
+  const { member, isExecOperator, adminSections } = useAuth()
   const { data, loading, error, warning, retry } = useQuery(() => getOverview(member.id), [member.id], {
     initialData: emptyOverview(),
   })
@@ -74,6 +75,20 @@ export default function HomeScreen() {
         <ActivityWeatherIcon weather={weatherQuery.data ?? { weatherType: 'collecting', grade: '확인 중' }} size="hero" />
       </div>
     </section>
+
+    {isExecOperator && <section className="mast-admin-access">
+      <div className="mast-section-heading"><h2>관리자 기능</h2><Link to="/admin">관리자 콘솔 <ChevronRight /></Link></div>
+      <div className="mast-quick-grid">
+        {ADMIN_SECTIONS.filter((s) => adminSections.includes(s.key)).map((s) => {
+          const Icon = s.Icon
+          return <Link to={s.to} className="mast-quick-card" key={s.key}>
+            <span className="mast-quick-icon violet"><Icon /></span>
+            <div><h2>{s.label}</h2><p>임원진 관리 기능</p></div>
+            <ChevronRight />
+          </Link>
+        })}
+      </div>
+    </section>}
 
     {data.announcements[0] && <Link to="/announcements" className="mast-home-notice-banner">
       <Bell />
