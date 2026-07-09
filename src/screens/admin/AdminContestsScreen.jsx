@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { MessageSquareText, Pencil, Plus, Power, Trophy } from 'lucide-react'
+import { Link2, MessageSquareText, Pencil, Plus, Power, Sparkles, Trophy } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
 import Badge from '../../components/Badge'
 import Modal from '../../components/Modal'
@@ -9,6 +9,7 @@ import { Field, FormActions } from '../../components/FormControls'
 import { ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
 import { contestDeadlineEnd, createContest, getAllContests, setContestActive, updateContest } from '../../services/contestService'
+import { scrapeContestFromUrl } from '../../services/contestScrapeService'
 import { formatDate } from '../../utils/display'
 
 const blank = {
@@ -100,7 +101,45 @@ export default function AdminContestsScreen({ compact = false }) {
 function ContestForm({ initial, onSubmit, onCancel, busy }) {
   const [form, setForm] = useState(initial)
   const set = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
+  const [scrapeUrl, setScrapeUrl] = useState(initial.link || '')
+  const [scraping, setScraping] = useState(false)
+  const [scrapeMsg, setScrapeMsg] = useState('')
+  const [scrapeErr, setScrapeErr] = useState(false)
+  const runScrape = async () => {
+    if (!scrapeUrl.trim()) return
+    setScraping(true); setScrapeMsg(''); setScrapeErr(false)
+    try {
+      const r = await scrapeContestFromUrl(scrapeUrl)
+      // 비어있는 칸만 자동으로 채움(기존 입력값은 보존). 링크는 항상 갱신.
+      setForm((prev) => ({
+        ...prev,
+        title: prev.title || r.title,
+        organizer: prev.organizer || r.organizer,
+        registration_deadline: prev.registration_deadline || r.registration_deadline,
+        registration_period: prev.registration_period || r.registration_period,
+        description: prev.description || r.description,
+        link: r.link || prev.link,
+      }))
+      const got = [r.title && '공모전명', r.organizer && '주최', r.registration_deadline && '마감일'].filter(Boolean)
+      setScrapeMsg(got.length
+        ? `불러왔어요: ${got.join(', ')}. 빈 칸만 채웠으니 값을 확인·수정한 뒤 저장하세요.`
+        : '페이지 구조상 자동 추출이 어려웠어요. 링크만 넣어두었으니 나머지는 직접 입력해 주세요.')
+    } catch (e) {
+      setScrapeErr(true); setScrapeMsg(e.message)
+    } finally {
+      setScraping(false)
+    }
+  }
   return <form className="data-form" onSubmit={(event) => { event.preventDefault(); onSubmit(form) }}>
+    <div className="contest-scrape">
+      <label className="contest-scrape-label"><Sparkles size={15} /> 공모전 링크로 자동 채우기</label>
+      <div className="contest-scrape-row">
+        <span className="contest-scrape-input"><Link2 size={15} /><input type="url" value={scrapeUrl} onChange={(event) => setScrapeUrl(event.target.value)} placeholder="https://... 공모전 공고 링크 붙여넣기" /></span>
+        <button type="button" className="button primary" onClick={runScrape} disabled={scraping || !scrapeUrl.trim()}>{scraping ? '불러오는 중…' : '가져오기'}</button>
+      </div>
+      {scrapeMsg && <p className={`contest-scrape-msg${scrapeErr ? ' is-error' : ''}`}>{scrapeMsg}</p>}
+      <small>링크의 페이지를 읽어 공모전명·주최·마감일을 추정해 채웁니다. 사이트에 따라 일부만 가져올 수 있어요.</small>
+    </div>
     <div className="form-grid">
       <Field label="공모전명" required><input value={form.title} onChange={(event) => set('title', event.target.value)} required /></Field>
       <Field label="주최/주관 기관" required><input value={form.organizer} onChange={(event) => set('organizer', event.target.value)} required /></Field>

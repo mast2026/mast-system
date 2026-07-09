@@ -5402,3 +5402,14 @@ svg.login-v2-wave{bottom:-17px!important}
     height:132px!important;
   }
 }
+
+/* 공모전 링크 자동 채우기 */
+.contest-scrape{border:1px solid #dce7fb;background:linear-gradient(180deg,#f5f9ff,#eef4ff);border-radius:14px;padding:14px 15px;margin-bottom:16px}
+.contest-scrape-label{display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;color:#1f55cc;margin-bottom:9px}
+.contest-scrape-row{display:flex;gap:8px;align-items:stretch}
+.contest-scrape-input{flex:1;display:flex;align-items:center;gap:7px;background:#fff;border:1px solid #cdd9ee;border-radius:10px;padding:0 11px;color:#7a89a3}
+.contest-scrape-input input{flex:1;border:0;outline:0;background:transparent;padding:10px 0;font-size:14px;color:#1b2536}
+.contest-scrape-row .button{white-space:nowrap}
+.contest-scrape-msg{margin:9px 0 4px;font-size:13px;color:#1f7a44;line-height:1.45;background:#e9f9f0;border-radius:8px;padding:8px 10px}
+.contest-scrape-msg.is-error{color:#c0392b;background:#fdeceb}
+.contest-scrape small{display:block;color:#8a96aa;font-size:12px;line-height:1.4}
