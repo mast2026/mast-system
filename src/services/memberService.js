@@ -1,7 +1,6 @@
 import { TABLES, requireSupabase, selectOne, throwIfError } from './baseService'
 
 const PUBLIC_MEMBER_FIELDS = 'id,mast_member_id,name,school,major,generation,role,is_leader,position_title,created_at,updated_at'
-const ADMIN_LOGIN_CODE = import.meta.env.VITE_ADMIN_LOGIN_CODE || 'MAST-ADMIN'
 const ADMIN_ROLES = ['admin', 'manager', 'professor']
 let passwordCapabilityPromise
 
@@ -211,36 +210,14 @@ async function getStoredPasswordHashes(memberId) {
   return [...new Set(hashes.filter(Boolean))]
 }
 
+// 관리자 코드는 클라이언트에서 비교하지 않습니다. 실제 코드값은 DB에만 있고,
+// Supabase RPC(verify_admin_code)가 서버에서 검증합니다. (supabase/secure-admin-code.sql)
 export async function loginAdminWithCode(code) {
   const adminCode = String(code ?? '').trim()
   if (!adminCode) throw new Error('관리자 코드를 입력하세요.')
-  if (adminCode !== ADMIN_LOGIN_CODE) throw new Error('관리자 코드가 일치하지 않습니다.')
-  const { data, error } = await requireSupabase()
-    .from(TABLES.members)
-    .select(PUBLIC_MEMBER_FIELDS)
-    .in('role', ADMIN_ROLES)
-    .order('role', { ascending: true })
-    .order('id', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+  const { data, error } = await requireSupabase().rpc('verify_admin_code', { p_code: adminCode })
   throwIfError(error)
-  if (!data) throw new Error('DB에 관리자 계정이 없습니다.')
-  return attachAdminSections(data)
-}
-
-export async function loginPrivilegedMemberWithCode(memberId, code) {
-  const adminCode = String(code ?? '').trim()
-  if (!memberId) throw new Error('관리자 계정을 선택하세요.')
-  if (!adminCode) throw new Error('관리자 코드를 입력하세요.')
-  if (adminCode !== ADMIN_LOGIN_CODE) throw new Error('관리자 코드가 일치하지 않습니다.')
-  const { data, error } = await requireSupabase()
-    .from(TABLES.members)
-    .select(PUBLIC_MEMBER_FIELDS)
-    .eq('id', memberId)
-    .maybeSingle()
-  throwIfError(error)
-  if (!data) throw new Error('관리자 계정을 찾을 수 없습니다.')
-  if (!ADMIN_ROLES.includes(data.role)) throw new Error('관리자 페이지 접근 권한이 없는 회원입니다.')
+  if (!data) throw new Error('관리자 코드가 일치하지 않습니다.')
   return attachAdminSections(data)
 }
 

@@ -127,8 +127,7 @@ export default function LoginScreen() {
       <form onSubmit={submit}>
         <div className="login-input">
           <UserRound className="login-input-icon" />
-          <input list="member-names" value={name} onChange={(e) => { setName(e.target.value); setMessage(''); setInfo('') }} placeholder="이름을 입력하세요" autoComplete="name" required />
-          <datalist id="member-names">{members.map((m) => <option key={m.id} value={m.name} />)}</datalist>
+          <input value={name} onChange={(e) => { setName(e.target.value); setMessage(''); setInfo('') }} placeholder="이름을 입력하세요" autoComplete="off" required />
         </div>
 
         {sameNameCount > 1 ? <div className="login-input">
