@@ -109,6 +109,11 @@ export async function checkHasPassword(memberId) {
 // 숫자만 추출해서 비교 (기수: "1기" = 1 = "1" 모두 같게 처리)
 const extractNum = (v) => String(v ?? '').replace(/[^0-9]/g, '')
 const normalizeStr = (v) => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+// 서울 본교 표기는 통일: "○○대학교(서울)" / "○○대학교 서울캠퍼스" 를 "○○대학교" 로 취급
+// → 학교를 "동국대학교" 로 넣든 "동국대학교(서울)" 로 넣든 로그인 시 같게 매칭 (구분은 비밀번호)
+const stripSeoulCampus = (v) => normalizeStr(v)
+  .replace(/대학교\s*[([]?\s*서울\s*(캠퍼스|캠)?\s*[)\]]?/g, '대학교')
+  .replace(/\s+/g, '')
 
 export async function loginFirstTime(name, school, generation, newPassword, confirmPassword, { roles } = {}) {
   let candidates = await findMembersByName(name)
@@ -126,10 +131,10 @@ export async function loginFirstTime(name, school, generation, newPassword, conf
     member = passwordless[0]
   } else {
     // 동명이인: 학교/기수로 구분 (로그인 화면 드롭다운이 DB값을 그대로 채워줌)
-    const inSchool = normalizeStr(school)
+    const inSchool = stripSeoulCampus(school)
     const inGen = extractNum(generation)
     const matches = passwordless.filter((m) => {
-      const dbSchool = normalizeStr(m.school)
+      const dbSchool = stripSeoulCampus(m.school)
       const dbGen = extractNum(m.generation)
       return (!dbSchool || dbSchool === inSchool) && (dbGen === '' || (inGen !== '' && dbGen === inGen))
     })
