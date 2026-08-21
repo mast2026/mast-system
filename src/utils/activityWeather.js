@@ -89,10 +89,20 @@ export const SCORE_RUBRIC = [
   { key: 'ot_jacket',          label: '오티 과잠바 착용',           points: 2,   group: 'gain' },
   { key: 'contest_submit',     label: '공모전 제출/미팅/피드백 참여', points: 5,   group: 'gain' },
   { key: 'contest_award',      label: '공모전 수상',               points: 20,  group: 'gain' },
+  { key: 'sns_ot_review_done',      label: 'MAST 공식 계정 오티 후기 작성',        points: 1,  group: 'gain' },
+  { key: 'sns_lecture_review',      label: 'MAST 공식 계정 강의 후기 작성',        points: 1,  group: 'gain' },
+  { key: 'sns_engagement_done',     label: 'MAST 공식 계정 콘텐츠 좋아요/저장/댓글', points: 1,  group: 'gain' },
+  { key: 'sns_reels_participate',   label: 'MAST 공식 계정 릴스 참여',             points: 1,  group: 'gain' },
+  { key: 'eta_poster_done',         label: '에타 홍보기간 포스터 게시(수동)',        points: 1,  group: 'gain' },
+  { key: 'ot_attend_all_done',      label: '모든 오티 참여(수동)',                points: 1,  group: 'gain' },
   // 감점
   { key: 'ot_no_jacket',       label: '오티 과잠바 미착용',         points: -2,  group: 'deduct' },
   { key: 'contest_out',        label: '공모전 정정기간 외 아웃',     points: -10, group: 'deduct' },
   { key: 'contest_no_submit',  label: '공모전 제출/미팅/피드백 미참여', points: -5, group: 'deduct' },
+  { key: 'sns_ot_review_missed',    label: 'MAST 공식 계정 오티 후기 미작성',       points: -1, group: 'deduct' },
+  { key: 'sns_engagement_missed',   label: 'MAST 공식 계정 콘텐츠 상호작용 미참여', points: -1, group: 'deduct' },
+  { key: 'eta_poster_missed',       label: '에타 홍보기간 포스터 미게시(수동)',      points: -1, group: 'deduct' },
+  { key: 'ot_attend_all_missed',    label: '오티 불참(수동)',                    points: -1, group: 'deduct' },
 ]
 
 const RUBRIC_BY_KEY = Object.fromEntries(SCORE_RUBRIC.map((item) => [item.key, item]))
