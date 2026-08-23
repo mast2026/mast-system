@@ -54,15 +54,19 @@ export default function LoginScreen() {
     ;['1', '2', '3', '4', '5'].forEach((value) => values.add(value))
     return [...values].sort((a, b) => Number(a) - Number(b))
   }, [members])
-  const selectedMember = useMemo(() => {
-    const keyword = name.trim().toLocaleLowerCase()
-    return members.find((m) => String(m.name ?? '').trim().toLocaleLowerCase() === keyword)
-  }, [members, name])
   const sameNameMembers = useMemo(() => {
     const keyword = name.trim().toLocaleLowerCase()
     return members.filter((m) => String(m.name ?? '').trim().toLocaleLowerCase() === keyword)
   }, [members, name])
   const sameNameCount = sameNameMembers.length
+  // 동명이인이면 드롭다운에서 고른 사람이 기준입니다.
+  // (예전에는 무조건 id가 빠른 사람을 기준으로 삼아, 그 사람이 이미 비밀번호를 설정했으면
+  //  같은 이름의 다른 회원이 첫 로그인을 할 수 없었습니다.)
+  const needsPick = sameNameCount > 1 && !pickedId
+  const selectedMember = useMemo(() => {
+    if (pickedId) return sameNameMembers.find((m) => String(m.id) === String(pickedId)) ?? null
+    return sameNameCount === 1 ? sameNameMembers[0] : null
+  }, [sameNameMembers, sameNameCount, pickedId])
 
   useEffect(() => {
     if (!selectedMember) { setHasPassword(null); return }
@@ -79,11 +83,14 @@ export default function LoginScreen() {
     setInfo('')
     setSubmitting(true)
     try {
+      if (needsPick) throw new Error('같은 이름의 회원이 여러 명입니다. 본인 학교·기수를 먼저 선택해 주세요.')
       if (!selectedMember) throw new Error('회원 목록에서 일치하는 이름을 찾지 못했습니다. 이름을 정확히 입력하거나 목록에서 선택해 주세요.')
       if (isCheckingPw) throw new Error('계정 정보를 확인 중입니다. 잠시 후 다시 눌러 주세요.')
       const withTimeout = (p) => Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Error('DB 연결을 확인해 주세요.')), 8000))])
-      const tryPassword = () => withTimeout(loginWithPassword(name, password, { roles: modeConfig.roles }))
-      const tryFirst = () => withTimeout(loginFirstTime(name, school, generation, password, confirmPassword, { roles: modeConfig.roles }))
+      // 고른 회원으로 후보를 좁혀, 동명이인이 서로의 계정으로 로그인되는 것을 막습니다.
+      const opts = { roles: modeConfig.roles, memberId: selectedMember.id }
+      const tryPassword = () => withTimeout(loginWithPassword(name, password, opts))
+      const tryFirst = () => withTimeout(loginFirstTime(name, school, generation, password, confirmPassword, opts))
       let member
       try {
         member = isFirstLogin ? await tryFirst() : await tryPassword()
@@ -127,7 +134,7 @@ export default function LoginScreen() {
       <form onSubmit={submit}>
         <div className="login-input">
           <UserRound className="login-input-icon" />
-          <input value={name} onChange={(e) => { setName(e.target.value); setMessage(''); setInfo('') }} placeholder="이름을 입력하세요" autoComplete="off" required />
+          <input value={name} onChange={(e) => { setName(e.target.value); setPickedId(''); setSchool(''); setGeneration(''); setMessage(''); setInfo('') }} placeholder="이름을 입력하세요" autoComplete="off" required />
         </div>
 
         {sameNameCount > 1 ? <div className="login-input">
@@ -158,10 +165,10 @@ export default function LoginScreen() {
 
         {isFirstLogin && <PasswordField value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="비밀번호를 한 번 더 입력" autoComplete="new-password" minLength={4} required />}
 
-        {name.trim() && !selectedMember && !loading && <div className="login-v2-note warning">회원 목록에서 같은 이름을 찾지 못했어요. 이름을 정확히 입력해 주세요.</div>}
+        {name.trim() && !sameNameCount && !loading && <div className="login-v2-note warning">회원 목록에서 같은 이름을 찾지 못했어요. 이름을 정확히 입력해 주세요.</div>}
+        {needsPick && <div className="login-v2-note">같은 이름의 회원이 여러 명이에요. 위에서 본인 학교·기수를 선택해 주세요.</div>}
         {isCheckingPw && <div className="login-v2-note"><LoadingCloud size="small" text="계정 확인 중..." /></div>}
-        {isFirstLogin && <div className="login-v2-note success">첫 로그인이에요. 학교·기수 확인 후 비밀번호를 설정하면 가입됩니다.</div>}
-        {!isFirstLogin && sameNameCount > 1 && <div className="login-v2-note">같은 이름의 회원이 여러 명이에요. 학교·기수를 함께 입력하면 정확히 로그인됩니다.</div>}
+        {isFirstLogin && <div className="login-v2-note success">첫 로그인이에요. 비밀번호를 설정하면 가입됩니다.</div>}
         {info && <div className="login-v2-note">{info}</div>}
         {message && <div className="login-v2-note error">{message}</div>}
         {error && <div className="login-v2-note error">{error.message}</div>}
