@@ -111,7 +111,6 @@ export default function ActivityWeatherScreen() {
           {AUTOMATIC_SCORE_ITEMS.map((it) => <li key={it.label}><span>{it.label}</span><em>{formatPoints(it.points)}</em></li>)}
         </ul>
       </div>
-      <p className="score-guide-note">수동 항목은 운영진이 관리하고, 자동 항목은 출석·홍보·팀 참여·동료평가 기록에 따라 반영됩니다.</p>
     </section>}
 
     {!exempt && <section className="weather-breakdown">
@@ -131,10 +130,6 @@ export default function ActivityWeatherScreen() {
       </div>
     </section>}
 
-    {!exempt && <div className="weather-tip">
-      <b>운영 목적</b>
-      <p>활동날씨는 평가나 서열화가 아니라, 원활한 팀 매칭과 협업을 돕기 위한 참고 정보입니다.</p>
-    </div>}
   </>
 }
 
