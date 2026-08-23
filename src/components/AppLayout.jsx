@@ -27,6 +27,10 @@ export default function AppLayout() {
     if (location.pathname === '/notifications') setHasNew(false)
   }, [location.pathname])
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname])
+
   const confirmLogout = () => {
     logout()
     navigate('/login')

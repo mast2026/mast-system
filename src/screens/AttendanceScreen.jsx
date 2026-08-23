@@ -54,7 +54,6 @@ export default function AttendanceScreen() {
 
       <section className="system-entry-hero attendance-live-hero">
         <div>
-          <span>MAST ATTENDANCE</span>
           <h1>출석</h1>
           <p>모임 일정과 출석 체크를 확인해요.</p>
           <button type="button" onClick={() => setTab('check')}>

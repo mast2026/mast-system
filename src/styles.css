@@ -326,6 +326,9 @@
 .entity-card-button:focus-visible{outline:2px solid var(--blue-dark);outline-offset:2px}
 .announcement-detail p{margin:0;white-space:pre-wrap;color:#526873;font-size:14px;line-height:1.8;word-break:keep-all;overflow-wrap:anywhere}
 .announcement-detail time{display:block;margin-top:22px;padding-top:14px;border-top:1px solid var(--line);color:#91a0a8;font-size:12px}
+.bottom-nav{height:calc(72px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom)}
+.bottom-nav a{justify-content:flex-start;padding-top:10px;min-width:0}
+.bottom-nav a span{line-height:1.25;white-space:nowrap}
 .admin-side-collapsed .admin-logout-quick{display:flex;width:42px;height:42px;margin:auto auto 4px}
 .admin-side-collapsed .admin-logout-quick span{display:none}
 .badge-matched{background:#e1f6ec;color:#27835b}
@@ -5390,7 +5393,7 @@ svg.login-v2-wave{bottom:-17px!important}
 @media(max-width:600px){
   .weather-hero{
     min-height:218px!important;
-    margin:-10px -16px -8px!important;
+    margin:0 -16px -8px!important;
     padding:22px 15px 42px!important;
     grid-template-columns:minmax(0,1fr) 118px!important;
     gap:6px!important;
@@ -5445,3 +5448,5 @@ svg.login-v2-wave{bottom:-17px!important}
     overflow:hidden;
   }
 }
+
+.weather-hero{margin-top:0!important}
