@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowRight, CalendarClock, CalendarDays, CheckCircle2, ClipboardList, Home, KeyRound, Plus, Trash2, UserCheck, UserX } from 'lucide-react'
+import { ArrowRight, CalendarClock, CalendarDays, CheckCircle2, ClipboardList, Clock, Home, KeyRound, Plus, Search, ShieldCheck, Trash2, UserCheck, UserX, X } from 'lucide-react'
 import Badge from '../../components/Badge'
 import Modal from '../../components/Modal'
 import { Field, FormActions } from '../../components/FormControls'
@@ -283,10 +283,18 @@ function AttendanceListBlock({ title, sessions, empty, onEdit, onDelete }) {
 function AttendanceRecordsPanel({ sessions, records, members, activeSession, selectedSessionId, onSelectSession, onMark, onBulkMark, busy }) {
   const selectedId = selectedSessionId || activeSession?.id || ''
   const [picked, setPicked] = useState(() => new Set())
+  const [keyword, setKeyword] = useState('')
   const sessionRecords = records.filter((record) => String(record.session_id) === String(selectedId))
   const recordMap = new Map(sessionRecords.map((record) => [String(record.member_id), record]))
-  const presentMembers = members.filter((member) => ['present', 'late', 'excused'].includes(recordMap.get(String(member.id))?.status))
-  const absentMembers = members.filter((member) => !['present', 'late', 'excused'].includes(recordMap.get(String(member.id))?.status))
+  // 이름·학교·기수로 검색합니다. (회원이 많아 스크롤로 찾기 어려움)
+  const visibleMembers = useMemo(() => {
+    const key = keyword.trim().toLocaleLowerCase().replace(/\s+/g, '')
+    if (!key) return members
+    return members.filter((member) => `${member.name ?? ''}${member.school ?? ''}${member.gi ?? member.generation ?? ''}`
+      .toLocaleLowerCase().replace(/\s+/g, '').includes(key))
+  }, [members, keyword])
+  const presentMembers = visibleMembers.filter((member) => ['present', 'late', 'excused'].includes(recordMap.get(String(member.id))?.status))
+  const absentMembers = visibleMembers.filter((member) => !['present', 'late', 'excused'].includes(recordMap.get(String(member.id))?.status))
 
   const toggle = (id) => setPicked((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const setMany = (ids, select) => setPicked((prev) => { const n = new Set(prev); ids.forEach((id) => (select ? n.add(id) : n.delete(id))); return n })
@@ -303,6 +311,19 @@ function AttendanceRecordsPanel({ sessions, records, members, activeSession, sel
       </select>
     </div>
     {!sessions.length ? <EmptyState title="모임이 없습니다" description="일정을 먼저 등록해 주세요." /> : <>
+      <div className="attendance-search-bar">
+        <Search />
+        <input
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          placeholder="이름·학교·기수로 검색 (예: 정세민, 이화여대, 3기)"
+          aria-label="회원 검색"
+        />
+        {keyword && <>
+          <b>{visibleMembers.length}명</b>
+          <button type="button" className="attendance-search-clear" onClick={() => setKeyword('')} aria-label="검색어 지우기"><X /></button>
+        </>}
+      </div>
       <div className="attendance-bulk-bar">
         <span>선택 <b>{picked.size}</b>명 · 선택한 회원을 일괄 처리</span>
         <div className="attendance-bulk-actions">
@@ -340,9 +361,11 @@ function RosterColumn({ title, members, recordMap, onMark, busy, picked, onToggl
           {record?.checked_at && <small className="attendance-check-time">체크 {fmtCheckTime(record.checked_at)}{lateNote}</small>}
         </div>
         <Badge value={attendanceStatusLabel(status)} />
-        <div>
-          <button type="button" disabled={busy} onClick={() => onMark(member, 'present')}><CheckCircle2 />출석</button>
-          <button type="button" disabled={busy} onClick={() => onMark(member, 'absent')}><UserX />결석</button>
+        <div className="attendance-row-actions">
+          <button type="button" className={status === 'present' ? 'on' : ''} disabled={busy} onClick={() => onMark(member, 'present')}><CheckCircle2 />출석</button>
+          <button type="button" className={status === 'late' ? 'on' : ''} disabled={busy} onClick={() => onMark(member, 'late')}><Clock />지각</button>
+          <button type="button" className={status === 'absent' ? 'on' : ''} disabled={busy} onClick={() => onMark(member, 'absent')}><UserX />결석</button>
+          <button type="button" className={status === 'excused' ? 'on' : ''} disabled={busy} onClick={() => onMark(member, 'excused')}><ShieldCheck />면제</button>
         </div>
       </div>
     })}
