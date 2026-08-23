@@ -314,6 +314,14 @@
 /* 관리자 로그아웃: 접힌 메뉴와 모바일에서도 항상 접근 가능 */
 .admin-logout-quick{display:none;border:0;color:#fff;background:rgba(255,255,255,.12);border-radius:12px;align-items:center;justify-content:center;gap:8px;font-weight:800}
 .admin-logout-quick svg{width:18px;height:18px}
+.logout-confirm-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:22px;background:rgba(20,28,34,.26);backdrop-filter:blur(3px)}
+.logout-confirm-dialog{width:min(360px,100%);padding:25px 22px 20px;border:1px solid #dfe5e8;border-radius:20px;background:#fff;box-shadow:0 20px 60px rgba(24,36,43,.16);text-align:center}
+.logout-confirm-dialog h2{margin:0;color:#263746;font-size:20px;line-height:1.4;letter-spacing:-.02em}
+.logout-confirm-dialog p{margin:9px 0 22px;color:#748590;font-size:13px;line-height:1.6;word-break:keep-all}
+.logout-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.logout-confirm-actions button{min-height:46px;border:1px solid #dfe5e8;border-radius:13px;background:#fff;color:#52626b;font-weight:800}
+.logout-confirm-actions button:last-child{border-color:#aab5bb;color:#263746}
+.logout-confirm-actions button:focus-visible{outline:2px solid #7c8b93;outline-offset:2px}
 .admin-side-collapsed .admin-logout-quick{display:flex;width:42px;height:42px;margin:auto auto 4px}
 .admin-side-collapsed .admin-logout-quick span{display:none}
 .badge-matched{background:#e1f6ec;color:#27835b}
