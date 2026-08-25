@@ -4,7 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import ContestThumbnail from '../components/ContestThumbnail'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import useQuery from '../hooks/useQuery'
-import { contestDeadlineEnd, getActiveContests } from '../services/contestService'
+import { contestDeadlineEnd, getActiveContests, isContestRolling } from '../services/contestService'
 import { formatDate, pick, safeHttpUrl } from '../utils/display'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -49,8 +49,9 @@ const CLOSED_PREVIEW_CONTESTS = [
   },
 ]
 
-function daysUntilDeadline(value) {
-  const deadline = contestDeadlineEnd(value)
+function daysUntilDeadline(contest) {
+  if (isContestRolling(contest)) return null
+  const deadline = contestDeadlineEnd(contest.registration_deadline)
   if (!deadline) return null
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -59,6 +60,7 @@ function daysUntilDeadline(value) {
 }
 
 function deadlineTime(contest, fallback) {
+  if (isContestRolling(contest)) return fallback
   return contestDeadlineEnd(contest.registration_deadline)?.getTime() ?? fallback
 }
 
@@ -69,8 +71,9 @@ function recentContestOrder(a, b) {
   return String(b.id).localeCompare(String(a.id), 'ko')
 }
 
-function deadlineBadge(days, isClosed) {
+function deadlineBadge(days, isClosed, isRolling) {
   if (isClosed || (days !== null && days < 0)) return '접수 마감'
+  if (isRolling) return '상시'
   if (days === null) return '마감 미정'
   if (days === 0) return '오늘 마감'
   return `D-${days}`
@@ -86,7 +89,7 @@ export default function ContestsScreen() {
 
   const visibleContests = useMemo(() => {
     const filtered = deadlineFilter === 'all' ? contests : contests.filter((contest) => {
-      const days = daysUntilDeadline(contest.registration_deadline)
+      const days = daysUntilDeadline(contest)
       return days !== null && days >= 0 && days <= Number(deadlineFilter)
     })
     return filtered.slice().sort((a, b) => {
@@ -134,13 +137,14 @@ export default function ContestsScreen() {
         {visibleContests.map((contest) => {
           const officialUrl = safeHttpUrl(contest.link)
           const isClosed = ['closed', 'finished'].includes(contest.status)
-          const remainingDays = daysUntilDeadline(contest.registration_deadline)
+          const isRolling = isContestRolling(contest)
+          const remainingDays = daysUntilDeadline(contest)
           const isUrgent = !isClosed && remainingDays !== null && remainingDays <= 7
           return <article className={`contest-directory-card${isUrgent ? ' is-urgent' : ''}`} key={contest.id}>
             <div className="contest-card-main">
               <div className="contest-card-copy">
                 <div className="contest-card-status">
-                  <span className={isUrgent ? 'is-urgent' : ''}>{deadlineBadge(remainingDays, isClosed)}</span>
+                  <span className={isUrgent ? 'is-urgent' : ''}>{deadlineBadge(remainingDays, isClosed, isRolling)}</span>
                   <em>{isClosed ? '종료' : '모집 중'}</em>
                 </div>
                 <h2>{contest.title}</h2>
@@ -152,7 +156,7 @@ export default function ContestsScreen() {
             {contest.previewNotice && <p className="contest-preview-note">{contest.previewNotice}</p>}
 
             <div className="contest-card-facts">
-              <span><CalendarDays aria-hidden="true" /><b>마감</b>{formatDate(contest.registration_deadline)}</span>
+              <span><CalendarDays aria-hidden="true" /><b>마감</b>{isRolling ? '상시 모집' : formatDate(contest.registration_deadline)}</span>
               <span><FolderOpen aria-hidden="true" /><b>분야</b>{contest.category || '미정'}</span>
               <span><Trophy aria-hidden="true" /><b>상금</b>{contest.prize || '정보 없음'}</span>
               <span><UsersRound aria-hidden="true" /><b>인원</b>최대 {pick(contest, ['max_team_size'], '-')}명</span>

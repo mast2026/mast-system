@@ -3,6 +3,7 @@ import { TABLES, requireSupabase, selectAll, selectOne, throwIfError } from './b
 const CONTEST_FIELDS = ['title','organizer','prize','registration_period','registration_deadline','category','description','link','max_team_size','duplicate_allowed','has_presentation','presentation_date','hackathon_date','linked_commercialization','has_certificate','award_count','notes','is_active']
 const NUMBER_FIELDS = new Set(['max_team_size'])
 const BOOLEAN_FIELDS = new Set(['duplicate_allowed', 'has_presentation', 'linked_commercialization', 'has_certificate', 'is_active'])
+const ROLLING_DEADLINES = new Set(['2030-07-01', '2031-07-01'])
 const cleanContest = (values) => Object.fromEntries(CONTEST_FIELDS.map((key) => {
   const value = values[key]
   if (value === '' || value === undefined) return [key, null]
@@ -50,8 +51,14 @@ export function contestDeadlineEnd(value) {
 }
 
 export function isContestOpen(contest) {
-  if (!contest?.registration_deadline) return true
+  if (isContestRolling(contest)) return true
   const deadline = contestDeadlineEnd(contest.registration_deadline)
   if (!deadline || Number.isNaN(deadline.getTime())) return false
   return deadline.getTime() >= Date.now()
+}
+
+export function isContestRolling(contest) {
+  const deadline = String(contest?.registration_deadline || '').slice(0, 10)
+  const period = String(contest?.registration_period || '')
+  return !deadline || ROLLING_DEADLINES.has(deadline) || /(상시|수시|연중)\s*(모집|접수)?/.test(period)
 }

@@ -7,6 +7,7 @@ export const descriptionOf = (item) => pick(item, ['description', 'body', 'conte
 export const statusOf = (item) => pick(item, ['status', 'recruitment_status', 'application_status'], 'unknown')
 export const formatDate = (value) => {
   if (!value) return '-'
+  if (['2030-07-01', '2031-07-01'].includes(String(value).slice(0, 10))) return '상시 모집'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
   return new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium' }).format(date)

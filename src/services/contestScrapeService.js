@@ -34,16 +34,14 @@ function guessDeadline(content) {
   let best = null, bestDist = Infinity
   let m
   while ((m = kw.exec(content))) {
+    if (/(안내|초과|유의|마감된|비공개)/.test(content.slice(m.index, m.index + 40))) continue
     for (const d of dates) {
       const dist = d.idx - m.index
       if (dist >= -50 && dist < 220 && Math.abs(dist) < bestDist) { bestDist = Math.abs(dist); best = d }
     }
   }
   if (best) return best.iso
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const future = dates.filter((d) => new Date(d.iso) >= today).sort((a, b) => (a.iso < b.iso ? -1 : 1))
-  if (future.length) return future[0].iso
-  return dates.slice().sort((a, b) => (a.iso < b.iso ? 1 : -1))[0].iso
+  return ''
 }
 
 function guessPeriod(content) {

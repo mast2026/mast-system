@@ -13,7 +13,7 @@ import PageHeader from '../components/PageHeader'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import { useAuth } from '../context/AuthContext'
 import useQuery from '../hooks/useQuery'
-import { contestDeadlineEnd, getContestById, isContestOpen } from '../services/contestService'
+import { contestDeadlineEnd, getContestById, isContestOpen, isContestRolling } from '../services/contestService'
 import { getMyLeaderApplication } from '../services/leaderService'
 import { getEnrichedTeams } from '../services/teamService'
 import { formatDate, safeHttpUrl } from '../utils/display'
@@ -42,7 +42,7 @@ export default function ContestDetailScreen() {
   if (!q.data.contest) return <EmptyState title="공모전을 찾을 수 없어요" description="접수 마감 또는 비공개 처리된 공모전입니다." />
 
   const contest = q.data.contest
-  const dday = getDday(contest.registration_deadline)
+  const dday = isContestRolling(contest) ? '상시 모집' : getDday(contest.registration_deadline)
   const officialUrl = safeHttpUrl(contest.link)
   const myLeaderTeam = q.data.allTeams.find((team) => Number(team.leader_id) === Number(member?.id))
 
