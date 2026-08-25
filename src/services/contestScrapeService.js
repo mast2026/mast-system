@@ -4,7 +4,7 @@
 // 결과는 "추정값"이라 저장 전 관리자가 확인·수정하는 것을 전제로 합니다.
 
 const READER = 'https://r.jina.ai/'
-const THUMBNAIL_CACHE_PREFIX = 'mast-contest-thumbnail:'
+const THUMBNAIL_CACHE_PREFIX = 'mast-contest-thumbnail:v2:'
 const thumbnailRequests = new Map()
 
 function normalizeUrl(input) {
@@ -101,11 +101,13 @@ function collectImageCandidates(data) {
 
 function scoreImageCandidate(candidate) {
   const text = `${candidate.label} ${candidate.url}`.toLowerCase()
-  if (/(favicon|sprite|avatar|profile|logo|icon|badge|tracking|pixel|doubleclick|ads?[-_/])/i.test(text)) return -100
+  if (/(favicon|sprite|avatar|profile|logo|icon|badge|tracking|pixel|doubleclick|ads?[-_/]|s\.w\.org\/images\/core\/emoji|\/emoji\/)/i.test(text)) return -100
   let score = 0
   if (/(공모|contest|competition|poster|포스터|main|visual|thumbnail|thumb)/i.test(text)) score += 8
   if (/\.(avif|webp|jpe?g|png)(?:\?|$)/i.test(candidate.url)) score += 4
   if (/(2026|award|대회|아이디어)/i.test(text)) score += 2
+  const size = decodeURIComponent(candidate.url).match(/(?:resize|fit)=(\d+)[,x](\d+)/i)
+  if (size && Number(size[2]) > Number(size[1])) score += 6
   if (candidate.url.length > 320) score -= 2
   return score
 }
@@ -143,8 +145,8 @@ export function getContestThumbnail(rawUrl) {
       const data = payload?.data || payload || {}
       let image = ''
       let bestScore = -1
-      for (const candidate of collectImageCandidates(data)) {
-        const score = scoreImageCandidate(candidate)
+      for (const [index, candidate] of collectImageCandidates(data).entries()) {
+        const score = scoreImageCandidate(candidate) + Math.max(0, 4 - index)
         if (score > bestScore) {
           image = candidate.url
           bestScore = score
