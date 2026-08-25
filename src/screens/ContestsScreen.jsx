@@ -146,7 +146,7 @@ export default function ContestsScreen() {
                 <h2>{contest.title}</h2>
                 <p className="contest-organizer">{contest.organizer || '주최 기관 미정'}</p>
               </div>
-              <ContestThumbnail id={contest.id} title={contest.title} category={contest.category} link={officialUrl} />
+              <ContestThumbnail id={contest.id} title={contest.title} category={contest.category} />
             </div>
 
             {contest.previewNotice && <p className="contest-preview-note">{contest.previewNotice}</p>}

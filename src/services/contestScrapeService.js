@@ -4,8 +4,6 @@
 // 결과는 "추정값"이라 저장 전 관리자가 확인·수정하는 것을 전제로 합니다.
 
 const READER = 'https://r.jina.ai/'
-const THUMBNAIL_CACHE_PREFIX = 'mast-contest-thumbnail:v3:'
-const thumbnailRequests = new Map()
 
 function normalizeUrl(input) {
   let s = String(input || '').trim()
@@ -123,53 +121,6 @@ function pickBestImage(data) {
     }
   }
   return image
-}
-
-function readThumbnailCache(url) {
-  try {
-    const value = sessionStorage.getItem(THUMBNAIL_CACHE_PREFIX + url)
-    return value === null ? undefined : value
-  } catch {
-    return undefined
-  }
-}
-
-function writeThumbnailCache(url, value) {
-  try { sessionStorage.setItem(THUMBNAIL_CACHE_PREFIX + url, value || '') } catch { return undefined }
-}
-
-export function getContestThumbnail(rawUrl) {
-  const url = normalizeUrl(rawUrl)
-  if (!url) return Promise.resolve('')
-  const cached = readThumbnailCache(url)
-  if (cached !== undefined) return Promise.resolve(cached)
-  if (thumbnailRequests.has(url)) return thumbnailRequests.get(url)
-
-  const request = (async () => {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 12000)
-    try {
-      const response = await fetch(READER + url, {
-        headers: { Accept: 'application/json', 'X-Return-Format': 'markdown' },
-        signal: controller.signal,
-      })
-      if (!response.ok) return ''
-      const payload = await response.json()
-      const data = payload?.data || payload || {}
-      const image = pickBestImage(data)
-      writeThumbnailCache(url, image)
-      return image
-    } catch {
-      writeThumbnailCache(url, '')
-      return ''
-    } finally {
-      clearTimeout(timer)
-      thumbnailRequests.delete(url)
-    }
-  })()
-
-  thumbnailRequests.set(url, request)
-  return request
 }
 
 export async function scrapeContestFromUrl(rawUrl) {

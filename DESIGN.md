@@ -83,7 +83,7 @@ Base unit은 4px이다.
 - **Structure**: 공모전 ID로 찾는 자체 호스팅 WebP 또는 공모전명 기반 대체 비주얼.
 - **States**: 관찰 전, 로딩 skeleton, 이미지 표시, 오류 fallback.
 - **Accessibility**: 실제 이미지는 `[공모전명] 공고 이미지`, 대체 비주얼은 `aria-hidden`.
-- **Performance**: 목록은 360×480 WebP를 즉시 요청한다. 저장 파일이 없는 이전 공고만 화면 근처에서 원문 대표 이미지를 추출하며 세션 캐시를 사용한다.
+- **Performance**: 목록은 360×480 WebP만 즉시 요청한다. 원문 분석과 변환은 관리자 저장 시 한 번만 실행하며 회원 목록에서는 외부 공고 사이트를 요청하지 않는다.
 
 ## 6. Motion & Interaction
 

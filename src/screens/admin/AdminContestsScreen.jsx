@@ -10,7 +10,7 @@ import { ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
 import { contestDeadlineEnd, createContest, getAllContests, setContestActive, updateContest } from '../../services/contestService'
 import { scrapeContestFromUrl } from '../../services/contestScrapeService'
-import { saveContestThumbnail } from '../../services/contestThumbnailService'
+import { saveContestFallbackThumbnail, saveContestThumbnail } from '../../services/contestThumbnailService'
 import { formatDate } from '../../utils/display'
 
 const blank = {
@@ -59,6 +59,14 @@ export default function AdminContestsScreen({ compact = false }) {
       } catch (err) {
         thumbnailError = err.message
       }
+      if (!thumbnailSaved) {
+        try {
+          await saveContestFallbackThumbnail(saved.id, saved.title, saved.category)
+          thumbnailSaved = true
+        } catch (err) {
+          thumbnailError = err.message
+        }
+      }
       setEditing(null)
       setNotice(thumbnailSaved
         ? '공모전 정보와 최적화 썸네일을 저장했습니다.'
@@ -83,6 +91,7 @@ export default function AdminContestsScreen({ compact = false }) {
     setThumbnailProgress({ done: 0, total: targets.length })
     let nextIndex = 0
     let savedCount = 0
+    let fallbackCount = 0
     let failedCount = 0
     const worker = async () => {
       while (nextIndex < targets.length) {
@@ -94,7 +103,12 @@ export default function AdminContestsScreen({ compact = false }) {
           await saveContestThumbnail(contest.id, scraped.thumbnail_source_url)
           savedCount += 1
         } catch {
-          failedCount += 1
+          try {
+            await saveContestFallbackThumbnail(contest.id, contest.title, contest.category)
+            fallbackCount += 1
+          } catch {
+            failedCount += 1
+          }
         } finally {
           setThumbnailProgress((current) => ({ ...current, done: current.done + 1 }))
         }
@@ -103,7 +117,7 @@ export default function AdminContestsScreen({ compact = false }) {
 
     try {
       await Promise.all(Array.from({ length: Math.min(4, targets.length) }, worker))
-      setNotice(`썸네일 ${savedCount}개를 WebP로 저장했습니다.${failedCount ? ` ${failedCount}개는 대표 이미지를 찾지 못했습니다.` : ''}`)
+      setNotice(`포스터 ${savedCount}개와 대체 이미지 ${fallbackCount}개를 WebP로 저장했습니다.${failedCount ? ` ${failedCount}개는 저장하지 못했습니다.` : ''}`)
     } finally {
       setThumbnailProgress(null)
       setBusy(false)
