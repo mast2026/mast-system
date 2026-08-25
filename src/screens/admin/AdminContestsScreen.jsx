@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Link2, MessageSquareText, Pencil, Plus, Power, Sparkles, Trophy } from 'lucide-react'
+import { ImageDown, Link2, MessageSquareText, Pencil, Plus, Power, Sparkles, Trophy } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
 import Badge from '../../components/Badge'
 import Modal from '../../components/Modal'
@@ -10,6 +10,7 @@ import { ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
 import { contestDeadlineEnd, createContest, getAllContests, setContestActive, updateContest } from '../../services/contestService'
 import { scrapeContestFromUrl } from '../../services/contestScrapeService'
+import { saveContestThumbnail } from '../../services/contestThumbnailService'
 import { formatDate } from '../../utils/display'
 
 const blank = {
@@ -31,6 +32,7 @@ const blank = {
   award_count: '',
   notes: '',
   is_active: true,
+  thumbnail_source_url: '',
 }
 
 export default function AdminContestsScreen({ compact = false }) {
@@ -38,18 +40,72 @@ export default function AdminContestsScreen({ compact = false }) {
   const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [thumbnailProgress, setThumbnailProgress] = useState(null)
 
   const save = async (values) => {
     setBusy(true)
     setNotice('')
     try {
-      editing?.id ? await updateContest(editing.id, values) : await createContest(values)
+      const saved = editing?.id ? await updateContest(editing.id, values) : await createContest(values)
+      let thumbnailSaved = false
+      let thumbnailError = ''
+      try {
+        let sourceUrl = values.thumbnail_source_url
+        if (!sourceUrl && values.link) sourceUrl = (await scrapeContestFromUrl(values.link)).thumbnail_source_url
+        if (sourceUrl) {
+          await saveContestThumbnail(saved.id, sourceUrl)
+          thumbnailSaved = true
+        }
+      } catch (err) {
+        thumbnailError = err.message
+      }
       setEditing(null)
-      setNotice('공모전 정보를 저장했습니다.')
+      setNotice(thumbnailSaved
+        ? '공모전 정보와 최적화 썸네일을 저장했습니다.'
+        : `공모전 정보는 저장했습니다.${thumbnailError ? ` 썸네일: ${thumbnailError}` : ' 대표 이미지는 찾지 못했습니다.'}`)
       q.retry()
     } catch (err) {
       setNotice(err.message)
     } finally {
+      setBusy(false)
+    }
+  }
+
+  const optimizeExistingThumbnails = async () => {
+    const targets = (q.data || []).filter((contest) => contest.is_active && !deadlinePassed(contest.registration_deadline) && contest.link)
+    if (!targets.length) {
+      setNotice('최적화할 모집 중 공모전이 없습니다.')
+      return
+    }
+
+    setBusy(true)
+    setNotice('')
+    setThumbnailProgress({ done: 0, total: targets.length })
+    let nextIndex = 0
+    let savedCount = 0
+    let failedCount = 0
+    const worker = async () => {
+      while (nextIndex < targets.length) {
+        const contest = targets[nextIndex]
+        nextIndex += 1
+        try {
+          const scraped = await scrapeContestFromUrl(contest.link)
+          if (!scraped.thumbnail_source_url) throw new Error('대표 이미지 없음')
+          await saveContestThumbnail(contest.id, scraped.thumbnail_source_url)
+          savedCount += 1
+        } catch {
+          failedCount += 1
+        } finally {
+          setThumbnailProgress((current) => ({ ...current, done: current.done + 1 }))
+        }
+      }
+    }
+
+    try {
+      await Promise.all(Array.from({ length: Math.min(4, targets.length) }, worker))
+      setNotice(`썸네일 ${savedCount}개를 WebP로 저장했습니다.${failedCount ? ` ${failedCount}개는 대표 이미지를 찾지 못했습니다.` : ''}`)
+    } finally {
+      setThumbnailProgress(null)
       setBusy(false)
     }
   }
@@ -76,13 +132,17 @@ export default function AdminContestsScreen({ compact = false }) {
     registration_deadline: dateInput(contest.registration_deadline),
   })
 
+  const thumbnailButton = <button type="button" className="button secondary" disabled={busy || q.loading} onClick={optimizeExistingThumbnails}>
+    <ImageDown/>{thumbnailProgress ? `${thumbnailProgress.done}/${thumbnailProgress.total}` : '썸네일 최적화'}
+  </button>
+
   return <>
-    {!compact ? <PageHeader title="공모전 관리" description="공모전 등록, 노출, 결과 발표일, 결과 등록 흐름을 관리합니다." action={<button className="button primary" onClick={() => setEditing({ ...blank })}><Plus/>등록</button>} /> : <section className="admin-section-actions">
+    {!compact ? <PageHeader title="공모전 관리" description="공모전 등록, 노출, 결과 발표일, 결과 등록 흐름을 관리합니다." action={<div className="table-actions">{thumbnailButton}<button className="button primary" onClick={() => setEditing({ ...blank })}><Plus/>등록</button></div>} /> : <section className="admin-section-actions">
       <div>
         <h1>공모전</h1>
         <p>등록된 공모전과 회원 화면 노출 여부를 관리합니다.</p>
       </div>
-      <button className="button primary" onClick={() => setEditing({ ...blank })}><Plus/>공모전 등록</button>
+      <div className="table-actions">{thumbnailButton}<button className="button primary" onClick={() => setEditing({ ...blank })}><Plus/>공모전 등록</button></div>
     </section>}
     {notice && <div className="form-notice">{notice}</div>}
     {q.loading ? <LoadingState /> : q.error ? <ErrorState error={q.error} retry={q.retry} /> : <AdminTable rows={q.data} searchPlaceholder="공모전, 주최, 분야 검색" getSearchText={(row) => `${row.title} ${row.organizer} ${row.category}`}
@@ -121,8 +181,9 @@ function ContestForm({ initial, onSubmit, onCancel, busy }) {
         registration_period: r.registration_period || prev.registration_period,
         description: r.description || prev.description,
         link: r.link || prev.link,
+        thumbnail_source_url: r.thumbnail_source_url || prev.thumbnail_source_url,
       }))
-      const got = [r.title && '공모전명', r.organizer && '주최', r.registration_deadline && '마감일'].filter(Boolean)
+      const got = [r.title && '공모전명', r.organizer && '주최', r.registration_deadline && '마감일', r.thumbnail_source_url && '대표 이미지'].filter(Boolean)
       setScrapeMsg(got.length
         ? `불러왔어요: ${got.join(', ')}. 빈 칸만 채웠으니 값을 확인·수정한 뒤 저장하세요.`
         : '페이지 구조상 자동 추출이 어려웠어요. 링크만 넣어두었으니 나머지는 직접 입력해 주세요.')

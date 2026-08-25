@@ -112,6 +112,19 @@ function scoreImageCandidate(candidate) {
   return score
 }
 
+function pickBestImage(data) {
+  let image = ''
+  let bestScore = -1
+  for (const [index, candidate] of collectImageCandidates(data).entries()) {
+    const score = scoreImageCandidate(candidate) + Math.max(0, 4 - index)
+    if (score > bestScore) {
+      image = candidate.url
+      bestScore = score
+    }
+  }
+  return image
+}
+
 function readThumbnailCache(url) {
   try {
     const value = sessionStorage.getItem(THUMBNAIL_CACHE_PREFIX + url)
@@ -143,15 +156,7 @@ export function getContestThumbnail(rawUrl) {
       if (!response.ok) return ''
       const payload = await response.json()
       const data = payload?.data || payload || {}
-      let image = ''
-      let bestScore = -1
-      for (const [index, candidate] of collectImageCandidates(data).entries()) {
-        const score = scoreImageCandidate(candidate) + Math.max(0, 4 - index)
-        if (score > bestScore) {
-          image = candidate.url
-          bestScore = score
-        }
-      }
+      const image = pickBestImage(data)
       writeThumbnailCache(url, image)
       return image
     } catch {
@@ -199,5 +204,6 @@ export async function scrapeContestFromUrl(rawUrl) {
     registration_period: guessPeriod(content),
     description: description || firstMeaningfulLine(content),
     link: url,
+    thumbnail_source_url: pickBestImage(data),
   }
 }

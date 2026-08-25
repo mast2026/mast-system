@@ -80,10 +80,10 @@ Base unit은 4px이다.
 - **Layout**: 카드 내부 sidebar primitive. 콘텐츠가 길어도 버튼은 카드 하단에 정렬한다.
 
 ### Contest Thumbnail
-- **Structure**: 지연 로드한 공고 대표 이미지 또는 공모전명 기반 대체 비주얼.
+- **Structure**: 공모전 ID로 찾는 자체 호스팅 WebP 또는 공모전명 기반 대체 비주얼.
 - **States**: 관찰 전, 로딩 skeleton, 이미지 표시, 오류 fallback.
 - **Accessibility**: 실제 이미지는 `[공모전명] 공고 이미지`, 대체 비주얼은 `aria-hidden`.
-- **Performance**: 화면 근처 카드만 `IntersectionObserver`로 요청하며 세션 캐시를 사용한다.
+- **Performance**: 목록은 360×480 WebP를 즉시 요청한다. 저장 파일이 없는 이전 공고만 화면 근처에서 원문 대표 이미지를 추출하며 세션 캐시를 사용한다.
 
 ## 6. Motion & Interaction
 
@@ -119,4 +119,4 @@ Base unit은 4px이다.
 | Item | Location | Why accepted | Owner / Exit |
 |---|---|---|---|
 | 기존 전역 CSS의 원시 색상과 중복 규칙 | `src/styles.css`의 기존 화면 | 전역 정리는 이번 공모전 목록 요청보다 범위가 크고 회귀 위험이 높음 | 다음 전역 디자인 시스템 정리 시 토큰화 |
-| 공고 원문이 이미지 직링크를 차단할 수 있음 | 공모전 썸네일 | 원본 사이트 정책을 바꿀 수 없어 정보성 대체 비주얼을 항상 제공 | 추후 관리자 이미지 필드 도입 시 제거 |
+| 원문에서 대표 이미지를 찾지 못할 수 있음 | 공모전 썸네일 생성 | 정보성 대체 비주얼을 항상 제공하고 관리자가 일괄 변환을 재시도할 수 있게 함 | 관리자 직접 이미지 업로드 도입 시 제거 |
