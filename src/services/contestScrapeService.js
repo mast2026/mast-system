@@ -4,6 +4,8 @@
 // 결과는 "추정값"이라 저장 전 관리자가 확인·수정하는 것을 전제로 합니다.
 
 const READER = 'https://r.jina.ai/'
+const THUMBNAIL_CACHE_PREFIX = 'mast-contest-thumbnail:'
+const thumbnailRequests = new Map()
 
 function normalizeUrl(input) {
   let s = String(input || '').trim()
@@ -70,6 +72,97 @@ function firstMeaningfulLine(content) {
   const lines = String(content || '').split(/\n+/).map((l) => l.replace(/[#*>|_`]/g, '').trim())
   const l = lines.find((x) => x.length >= 15 && !/^https?:/.test(x))
   return l ? l.slice(0, 200) : ''
+}
+
+function collectImageCandidates(data) {
+  const candidates = []
+  const add = (url, label = '') => {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return
+    candidates.push({ url: url.trim(), label: String(label || '').trim() })
+  }
+
+  const knownImages = [data?.image, data?.ogImage, data?.openGraph?.image]
+  for (const image of knownImages) {
+    if (typeof image === 'string') add(image)
+    else add(image?.url, image?.alt)
+  }
+  for (const image of Array.isArray(data?.images) ? data.images : []) {
+    if (typeof image === 'string') add(image)
+    else add(image?.url || image?.src, image?.alt || image?.title)
+  }
+
+  const markdown = String(data?.content || data?.text || '')
+  const imagePattern = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)(?:\s+["'][^"']*["'])?\)/g
+  let match
+  while ((match = imagePattern.exec(markdown))) add(match[2], match[1])
+
+  return [...new Map(candidates.map((candidate) => [candidate.url, candidate])).values()]
+}
+
+function scoreImageCandidate(candidate) {
+  const text = `${candidate.label} ${candidate.url}`.toLowerCase()
+  if (/(favicon|sprite|avatar|profile|logo|icon|badge|tracking|pixel|doubleclick|ads?[-_/])/i.test(text)) return -100
+  let score = 0
+  if (/(공모|contest|competition|poster|포스터|main|visual|thumbnail|thumb)/i.test(text)) score += 8
+  if (/\.(avif|webp|jpe?g|png)(?:\?|$)/i.test(candidate.url)) score += 4
+  if (/(2026|award|대회|아이디어)/i.test(text)) score += 2
+  if (candidate.url.length > 320) score -= 2
+  return score
+}
+
+function readThumbnailCache(url) {
+  try {
+    const value = sessionStorage.getItem(THUMBNAIL_CACHE_PREFIX + url)
+    return value === null ? undefined : value
+  } catch {
+    return undefined
+  }
+}
+
+function writeThumbnailCache(url, value) {
+  try { sessionStorage.setItem(THUMBNAIL_CACHE_PREFIX + url, value || '') } catch { return undefined }
+}
+
+export function getContestThumbnail(rawUrl) {
+  const url = normalizeUrl(rawUrl)
+  if (!url) return Promise.resolve('')
+  const cached = readThumbnailCache(url)
+  if (cached !== undefined) return Promise.resolve(cached)
+  if (thumbnailRequests.has(url)) return thumbnailRequests.get(url)
+
+  const request = (async () => {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 12000)
+    try {
+      const response = await fetch(READER + url, {
+        headers: { Accept: 'application/json', 'X-Return-Format': 'markdown' },
+        signal: controller.signal,
+      })
+      if (!response.ok) return ''
+      const payload = await response.json()
+      const data = payload?.data || payload || {}
+      let image = ''
+      let bestScore = -1
+      for (const candidate of collectImageCandidates(data)) {
+        const score = scoreImageCandidate(candidate)
+        if (score > bestScore) {
+          image = candidate.url
+          bestScore = score
+        }
+      }
+      writeThumbnailCache(url, image)
+      return image
+    } catch {
+      writeThumbnailCache(url, '')
+      return ''
+    } finally {
+      clearTimeout(timer)
+      thumbnailRequests.delete(url)
+    }
+  })()
+
+  thumbnailRequests.set(url, request)
+  return request
 }
 
 export async function scrapeContestFromUrl(rawUrl) {
