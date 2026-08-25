@@ -5560,17 +5560,14 @@ svg.login-v2-wave{bottom:-17px!important}
 
 .contest-directory-hero{
   position:relative;
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 120px;
-  gap:var(--space-4);
-  align-items:stretch;
-  min-height:132px;
-  margin:-8px 0 var(--space-3);
+  display:block;
+  min-height:0;
+  margin:0 0 var(--space-4);
   padding:var(--space-5);
   overflow:hidden;
-  border:1px solid var(--border-default);
-  border-radius:var(--space-6);
-  background:radial-gradient(circle at 12% 8%,var(--surface-warm),transparent 48%),radial-gradient(circle at 78% 34%,var(--accent-soft),transparent 44%),var(--surface-card);
+  border:1px solid var(--text-primary);
+  border-radius:var(--space-4);
+  background:var(--surface-card);
 }
 
 .contest-directory-hero>div:first-child{
@@ -5643,12 +5640,18 @@ svg.login-v2-wave{bottom:-17px!important}
 }
 
 .contest-filter-bar{
-  display:grid;
+  display:flex;
+  align-items:center;
   gap:var(--space-2);
-  margin:0 0 var(--space-3);
-  padding:var(--space-2) 0 var(--space-3);
-  background:var(--surface-base);
+  min-width:0;
+  margin:0 0 var(--space-4);
+  padding:0;
+  overflow-x:auto;
+  background:transparent;
+  scrollbar-width:none;
 }
+
+.contest-filter-bar::-webkit-scrollbar{display:none}
 
 .contest-filter-summary{
   display:flex;
@@ -5676,8 +5679,9 @@ svg.login-v2-wave{bottom:-17px!important}
   align-items:center;
   gap:var(--space-1);
   min-height:44px;
-  padding:0 var(--space-3);
-  border:1px solid var(--border-default);
+  flex:0 0 auto;
+  padding:0 var(--space-2);
+  border:1px solid var(--text-primary);
   border-radius:var(--space-3);
   background:var(--surface-card);
   color:var(--accent-strong);
@@ -5690,7 +5694,7 @@ svg.login-v2-wave{bottom:-17px!important}
 }
 
 .contest-sort-control select{
-  max-width:132px;
+  max-width:108px;
   border:0;
   outline:0;
   background:transparent;
@@ -5710,18 +5714,14 @@ svg.login-v2-wave{bottom:-17px!important}
   min-width:0;
   margin:0;
   padding:0;
-  overflow-x:auto;
   border:0;
-  scrollbar-width:none;
 }
-
-.contest-deadline-filters::-webkit-scrollbar{display:none}
 
 .contest-deadline-filters button{
   min-height:44px;
   flex:0 0 auto;
-  padding:0 var(--space-4);
-  border:1px solid var(--border-default);
+  padding:0 var(--space-3);
+  border:1px solid var(--text-primary);
   border-radius:var(--space-3);
   background:var(--surface-card);
   color:var(--text-secondary);
@@ -5738,9 +5738,9 @@ svg.login-v2-wave{bottom:-17px!important}
 .contest-deadline-filters button:active{transform:scale(.98)}
 
 .contest-deadline-filters button.is-selected{
-  border-color:var(--accent-soft);
-  background:var(--accent-soft);
-  color:var(--accent-strong);
+  border-color:var(--text-primary);
+  background:var(--text-primary);
+  color:var(--surface-card);
 }
 
 .contest-deadline-filters button:focus-visible,
@@ -6016,7 +6016,7 @@ svg.login-v2-wave{bottom:-17px!important}
 .contest-filter-empty button svg{width:16px;height:16px}
 
 @media(min-width:700px){
-  .contest-directory-hero{grid-template-columns:minmax(0,1fr) 148px;padding:var(--space-6)}
+  .contest-directory-hero{padding:var(--space-6)}
   .contest-directory-card{padding:var(--space-5)}
   .contest-card-main{grid-template-columns:minmax(0,1fr) 132px;gap:var(--space-5)}
   .contest-thumbnail{width:132px;height:160px}
@@ -6024,10 +6024,7 @@ svg.login-v2-wave{bottom:-17px!important}
 }
 
 @media(max-width:420px){
-  .contest-directory-hero{grid-template-columns:minmax(0,1fr) 104px;gap:var(--space-3);padding:var(--space-4)}
-  .contest-hero-summary{padding:var(--space-3)}
-  .contest-hero-summary small{font-size:11px}
-  .contest-filter-summary{align-items:flex-end}
+  .contest-directory-hero{padding:var(--space-5)}
   .contest-sort-control{padding:0 var(--space-2)}
   .contest-card-main{grid-template-columns:minmax(0,1fr) 88px}
   .contest-thumbnail{width:88px;height:116px}

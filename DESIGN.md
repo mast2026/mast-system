@@ -66,11 +66,11 @@ Base unit은 4px이다.
 ## 5. Components
 
 ### Contest Filter Bar
-- **Structure**: 결과 수, 필터 칩 그룹, 정렬 `select`.
+- **Structure**: 필터 칩 그룹과 정렬 `select`를 한 줄에 배치한다. 별도 결과 수 표시는 두지 않는다.
 - **Variants**: 전체, 7일 이내, 30일 이내 / 마감 임박순, 마감 여유순, 최근 등록순.
 - **States**: 기본, 선택, hover, active, focus-visible, 빈 결과.
 - **Accessibility**: `fieldset`/`legend`, 실제 `button`, 연결된 `label`과 `select`, 44px 터치 영역.
-- **Layout**: 모바일에서는 결과/정렬 1행과 가로 스크롤 칩 1행, 넓은 화면에서는 한 행 cluster.
+- **Layout**: 모든 화면에서 왼쪽부터 전체, 7일 이내, 30일 이내, 정렬 순의 한 행 cluster. 공간이 부족할 때만 해당 행 자체가 가로 스크롤된다.
 
 ### Contest Directory Card
 - **Structure**: 상태·D-day, 제목·기관, 핵심 정보, 대표 이미지, 팀 모집/공고 링크.

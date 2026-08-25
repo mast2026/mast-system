@@ -96,15 +96,6 @@ export default function ContestsScreen() {
     })
   }, [contests, deadlineFilter, sortOrder])
 
-  const nearestContest = useMemo(() => {
-    let nearest = null
-    for (const contest of contests) {
-      const days = daysUntilDeadline(contest.registration_deadline)
-      if (days !== null && days >= 0 && (!nearest || days < nearest.days)) nearest = { days }
-    }
-    return nearest
-  }, [contests])
-
   const resetFilters = () => {
     setDeadlineFilter('all')
     setSortOrder('deadline-asc')
@@ -117,11 +108,6 @@ export default function ContestsScreen() {
         <h1>{isClosedPreview ? '마감 공모전' : '공모전'}</h1>
         <p>{isClosedPreview ? '접수 마감 이후 회원 화면 상태를 확인합니다.' : '마감이 가까운 공고부터 빠르게 살펴보세요.'}</p>
       </div>
-      <div className="contest-hero-summary" aria-label={`모집 중인 공모전 ${contests.length}개`}>
-        <span>{isClosedPreview ? '프리뷰' : '모집 중'}</span>
-        <strong>{contests.length}</strong>
-        <small>{nearestContest ? `최단 마감 ${deadlineBadge(nearestContest.days, false)}` : '새 공고를 기다리는 중'}</small>
-      </div>
     </section>
 
     {isClosedPreview && <section className="developer-weather-panel contest-preview-panel">
@@ -131,20 +117,17 @@ export default function ContestsScreen() {
 
     {!isClosedPreview && query.loading ? <LoadingState /> : !isClosedPreview && query.error ? <ErrorState error={query.error} retry={query.retry} /> : !contests.length ? <EmptyState title="현재 모집 중인 공모전이 없습니다." /> : <>
       <section className="contest-filter-bar" aria-label="공모전 필터와 정렬">
-        <div className="contest-filter-summary">
-          <p aria-live="polite"><strong>{visibleContests.length}</strong>개의 공고</p>
-          <label className="contest-sort-control">
-            <ArrowDownUp aria-hidden="true" />
-            <span className="sr-only">정렬 기준</span>
-            <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
-              {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </label>
-        </div>
         <fieldset className="contest-deadline-filters">
           <legend className="sr-only">마감일까지 남은 기간</legend>
           {DEADLINE_FILTERS.map((filter) => <button type="button" key={filter.value} className={deadlineFilter === filter.value ? 'is-selected' : ''} aria-pressed={deadlineFilter === filter.value} onClick={() => setDeadlineFilter(filter.value)}>{filter.label}</button>)}
         </fieldset>
+        <label className="contest-sort-control">
+          <ArrowDownUp aria-hidden="true" />
+          <span className="sr-only">정렬 기준</span>
+          <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} aria-label={`${visibleContests.length}개 공고 정렬 기준`}>
+            {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
       </section>
 
       {visibleContests.length ? <div className="contest-directory-list">
