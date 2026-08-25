@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowRight, CalendarClock, CalendarDays, CheckCircle2, ClipboardList, Home, KeyRound, Plus, Trash2, UserCheck, UserX } from 'lucide-react'
+import { ArrowRight, CalendarClock, CalendarDays, Check, CheckCircle2, ClipboardList, Clock, Copy, Home, KeyRound, Plus, Search, ShieldCheck, Trash2, UserCheck, UserX, X } from 'lucide-react'
 import Badge from '../../components/Badge'
 import Modal from '../../components/Modal'
 import { Field, FormActions } from '../../components/FormControls'
@@ -283,10 +283,47 @@ function AttendanceListBlock({ title, sessions, empty, onEdit, onDelete }) {
 function AttendanceRecordsPanel({ sessions, records, members, activeSession, selectedSessionId, onSelectSession, onMark, onBulkMark, busy }) {
   const selectedId = selectedSessionId || activeSession?.id || ''
   const [picked, setPicked] = useState(() => new Set())
+  const [keyword, setKeyword] = useState('')
+  const [gen, setGen] = useState('')
+  const [copied, setCopied] = useState(false)
+  // 지금 보고 있는 모임 (출석코드를 함께 보여주기 위해 필요)
+  const shownSession = sessions.find((session) => String(session.id) === String(selectedId)) || activeSession
   const sessionRecords = records.filter((record) => String(record.session_id) === String(selectedId))
   const recordMap = new Map(sessionRecords.map((record) => [String(record.member_id), record]))
-  const presentMembers = members.filter((member) => ['present', 'late', 'excused'].includes(recordMap.get(String(member.id))?.status))
-  const absentMembers = members.filter((member) => !['present', 'late', 'excused'].includes(recordMap.get(String(member.id))?.status))
+  // 기수 탭 목록 (회원 데이터에 실제로 있는 기수만 표시)
+  const genOptions = useMemo(() => {
+    const counts = new Map()
+    members.forEach((member) => {
+      const g = memberGeneration(member)
+      if (g) counts.set(g, (counts.get(g) ?? 0) + 1)
+    })
+    return [...counts.entries()].sort((a, b) => Number(a[0]) - Number(b[0]))
+  }, [members])
+  // 기수 + 이름·학교 검색으로 좁힙니다. (회원이 많아 스크롤로 찾기 어려움)
+  const visibleMembers = useMemo(() => {
+    const key = keyword.trim().toLocaleLowerCase().replace(/\s+/g, '')
+    return members.filter((member) => {
+      if (gen && memberGeneration(member) !== gen) return false
+      if (!key) return true
+      return `${member.name ?? ''}${member.school ?? ''}${member.gi ?? member.generation ?? ''}`
+        .toLocaleLowerCase().replace(/\s+/g, '').includes(key)
+    })
+  }, [members, keyword, gen])
+  const presentMembers = visibleMembers.filter((member) => ['present', 'late', 'excused'].includes(recordMap.get(String(member.id))?.status))
+  const absentMembers = visibleMembers.filter((member) => !['present', 'late', 'excused'].includes(recordMap.get(String(member.id))?.status))
+  // 지금 보고 있는 기수(또는 전체)의 출석 집계. 면제는 출석률 모수에서 제외합니다.
+  const tally = useMemo(() => {
+    const t = { present: 0, late: 0, absent: 0, excused: 0 }
+    visibleMembers.forEach((member) => {
+      const status = recordMap.get(String(member.id))?.status
+      if (status === 'present') t.present += 1
+      else if (status === 'late') t.late += 1
+      else if (status === 'excused') t.excused += 1
+      else t.absent += 1
+    })
+    const base = t.present + t.late + t.absent
+    return { ...t, rate: base ? Math.round((t.present + t.late) / base * 100) : 0 }
+  }, [visibleMembers, sessionRecords])
 
   const toggle = (id) => setPicked((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const setMany = (ids, select) => setPicked((prev) => { const n = new Set(prev); ids.forEach((id) => (select ? n.add(id) : n.delete(id))); return n })
@@ -302,7 +339,52 @@ function AttendanceRecordsPanel({ sessions, records, members, activeSession, sel
         {sessions.map((session) => <option value={session.id} key={session.id}>{session.title || '모임'} · {formatSessionDate(session)}</option>)}
       </select>
     </div>
+    {shownSession && <div className="attendance-records-code">
+      <div>
+        <small>출석코드</small>
+        <b>{shownSession.attendance_code_enabled === false
+          ? '사용 안 함'
+          : (shownSession.attendance_code || '미등록')}</b>
+      </div>
+      <p>{formatSessionDate(shownSession)} · {shownSession.location || '장소 미정'}</p>
+      {!!shownSession.attendance_code && shownSession.attendance_code_enabled !== false && <button
+        type="button"
+        onClick={() => { navigator.clipboard?.writeText(shownSession.attendance_code); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+      >{copied ? <><Check />복사됨</> : <><Copy />복사</>}</button>}
+    </div>}
     {!sessions.length ? <EmptyState title="모임이 없습니다" description="일정을 먼저 등록해 주세요." /> : <>
+      {genOptions.length > 1 && <>
+        <div className="attendance-gen-tabs" role="group" aria-label="기수 선택">
+          <button type="button" className={gen === '' ? 'active' : ''} onClick={() => setGen('')}>
+            전체 <b>{members.length}</b>
+          </button>
+          {genOptions.map(([value, count]) => (
+            <button key={value} type="button" className={gen === value ? 'active' : ''} onClick={() => setGen(value)}>
+              {value}기 <b>{count}</b>
+            </button>
+          ))}
+        </div>
+        <div className="attendance-gen-summary">
+          <span>출석 <b>{tally.present}</b></span>
+          <span>지각 <b>{tally.late}</b></span>
+          <span className="miss">결석 <b>{tally.absent}</b></span>
+          <span>면제 <b>{tally.excused}</b></span>
+          <span className="rate">출석률 <b>{tally.rate}%</b></span>
+        </div>
+      </>}
+      <div className="attendance-search-bar">
+        <Search />
+        <input
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          placeholder="이름·학교·기수로 검색 (예: 정세민, 이화여대, 3기)"
+          aria-label="회원 검색"
+        />
+        {(keyword || gen) && <>
+          <b>{visibleMembers.length}명</b>
+          <button type="button" className="attendance-search-clear" onClick={() => { setKeyword(''); setGen('') }} aria-label="검색 조건 지우기"><X /></button>
+        </>}
+      </div>
       <div className="attendance-bulk-bar">
         <span>선택 <b>{picked.size}</b>명 · 선택한 회원을 일괄 처리</span>
         <div className="attendance-bulk-actions">
@@ -340,9 +422,11 @@ function RosterColumn({ title, members, recordMap, onMark, busy, picked, onToggl
           {record?.checked_at && <small className="attendance-check-time">체크 {fmtCheckTime(record.checked_at)}{lateNote}</small>}
         </div>
         <Badge value={attendanceStatusLabel(status)} />
-        <div>
-          <button type="button" disabled={busy} onClick={() => onMark(member, 'present')}><CheckCircle2 />출석</button>
-          <button type="button" disabled={busy} onClick={() => onMark(member, 'absent')}><UserX />결석</button>
+        <div className="attendance-row-actions">
+          <button type="button" className={status === 'present' ? 'on' : ''} disabled={busy} onClick={() => onMark(member, 'present')}><CheckCircle2 />출석</button>
+          <button type="button" className={status === 'late' ? 'on' : ''} disabled={busy} onClick={() => onMark(member, 'late')}><Clock />지각</button>
+          <button type="button" className={status === 'absent' ? 'on' : ''} disabled={busy} onClick={() => onMark(member, 'absent')}><UserX />결석</button>
+          <button type="button" className={status === 'excused' ? 'on' : ''} disabled={busy} onClick={() => onMark(member, 'excused')}><ShieldCheck />면제</button>
         </div>
       </div>
     })}
@@ -415,6 +499,11 @@ function AttendanceSessionForm({ initial, onSubmit, onCancel, busy }) {
     </Field>}
     <FormActions submitting={busy} submitLabel={initial?.id ? '모임 수정' : '모임 등록'} onCancel={onCancel} />
   </form>
+}
+
+// 레거시 members 는 gi("3기"), team_matching_members 는 generation(3) 을 씁니다.
+function memberGeneration(member) {
+  return String(member?.gi ?? member?.generation ?? '').replace(/[^0-9]/g, '')
 }
 
 function sortSessions(rows = []) {

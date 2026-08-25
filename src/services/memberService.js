@@ -114,9 +114,10 @@ const stripSeoulCampus = (v) => normalizeStr(v)
   .replace(/대학교\s*[([]?\s*서울\s*(캠퍼스|캠)?\s*[)\]]?/g, '대학교')
   .replace(/\s+/g, '')
 
-export async function loginFirstTime(name, school, generation, newPassword, confirmPassword, { roles } = {}) {
+export async function loginFirstTime(name, school, generation, newPassword, confirmPassword, { roles, memberId } = {}) {
   let candidates = await findMembersByName(name)
   if (roles?.length) candidates = candidates.filter((m) => roles.includes(m.role))
+  candidates = narrowToPicked(candidates, memberId)
   if (!candidates.length) throw new Error('일치하는 회원이 없습니다.')
 
   // 비밀번호가 아직 없는 후보만 추림
@@ -164,9 +165,19 @@ export async function loginFirstTime(name, school, generation, newPassword, conf
   return member
 }
 
-export async function loginWithPassword(name, password, { roles } = {}) {
+// 로그인 화면에서 동명이인 드롭다운으로 사람을 고른 경우, 그 사람만 후보로 남깁니다.
+// 이렇게 해야 (1) 같은 이름의 다른 회원 계정으로 잘못 로그인되는 일이 없고,
+//            (2) 우연히 비밀번호가 같은 동명이인끼리 계정이 뒤바뀌지 않습니다.
+function narrowToPicked(candidates, memberId) {
+  if (memberId === undefined || memberId === null || memberId === '') return candidates
+  const picked = candidates.filter((m) => String(m.id) === String(memberId))
+  return picked.length ? picked : candidates
+}
+
+export async function loginWithPassword(name, password, { roles, memberId } = {}) {
   let candidates = await findMembersByName(name)
   if (roles?.length) candidates = candidates.filter((m) => roles.includes(m.role))
+  candidates = narrowToPicked(candidates, memberId)
   if (!candidates.length) throw new Error('일치하는 회원이 없습니다.')
   if (!password || password.length < 4) throw new Error('비밀번호는 4자 이상 입력하세요.')
 

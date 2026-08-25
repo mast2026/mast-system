@@ -5037,6 +5037,70 @@ svg.login-v2-wave{bottom:-17px!important}
 .attendance-roster-row.has-check>div:nth-of-type(1){flex:1;min-width:0}
 .attendance-row-check{width:18px;height:18px;flex-shrink:0;cursor:pointer}
 
+/* 출석 현황: 선택한 모임의 출석코드 */
+.attendance-records-code{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;
+  background:linear-gradient(145deg,#f2f9ff,#eaf4ff);border:1px solid #d8e8f8;border-radius:14px;padding:11px 16px;
+}
+.attendance-records-code>div{display:flex;align-items:baseline;gap:9px}
+.attendance-records-code small{font-size:12px;font-weight:800;color:#5b7391}
+.attendance-records-code b{font-size:20px;font-weight:900;color:#0b4a8f;letter-spacing:2px}
+.attendance-records-code p{margin:0;font-size:12.5px;color:#6b7789}
+.attendance-records-code button{
+  margin-left:auto;border:1px solid #bcd8f2;background:#fff;border-radius:10px;padding:6px 13px;
+  font-size:12.5px;font-weight:800;color:#0b59d0;cursor:pointer;display:inline-flex;align-items:center;gap:5px;
+}
+.attendance-records-code button svg{width:14px;height:14px}
+
+/* 출석 현황: 기수 탭 (상단 관리 탭과 같은 모양) */
+.attendance-gen-tabs{
+  display:flex;gap:8px;overflow-x:auto;padding:5px;margin-bottom:10px;
+  border:1px solid #e6eef2;border-radius:18px;background:rgba(255,255,255,.78);scrollbar-width:none;
+}
+.attendance-gen-tabs::-webkit-scrollbar{display:none}
+.attendance-gen-tabs button{
+  flex:0 0 auto;min-height:37px;border:0;border-radius:14px;padding:0 15px;
+  background:transparent;color:#667785;font-size:12px;font-weight:900;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.attendance-gen-tabs button b{font-size:11px;font-weight:900;color:#9aa8b5}
+.attendance-gen-tabs button.active{
+  background:linear-gradient(145deg,#8bd7f8,#55b7e8);color:#fff;box-shadow:0 8px 18px rgba(85,183,232,.2);
+}
+.attendance-gen-tabs button.active b{color:rgba(255,255,255,.85)}
+
+/* 출석 현황: 선택한 기수 집계 */
+.attendance-gen-summary{
+  display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;
+  font-size:13px;color:#46506a;
+}
+.attendance-gen-summary span{
+  display:inline-flex;align-items:center;gap:5px;background:#f7faff;border:1px solid #e6eef9;
+  border-radius:999px;padding:5px 12px;font-weight:700;
+}
+.attendance-gen-summary span b{font-weight:900;color:#0b59d0}
+.attendance-gen-summary span.miss b{color:#c1121f}
+.attendance-gen-summary span.rate{background:#0b59d0;border-color:#0b59d0;color:#fff}
+.attendance-gen-summary span.rate b{color:#fff}
+
+/* 출석 현황: 회원 검색 */
+.attendance-search-bar{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #dde5f0;border-radius:12px;padding:9px 13px;margin-bottom:10px}
+.attendance-search-bar>svg{width:17px;height:17px;color:#8a94ab;flex-shrink:0}
+.attendance-search-bar input{flex:1;min-width:0;border:0;outline:0;font-size:14px;color:#1b2a4a;background:transparent}
+.attendance-search-bar input::placeholder{color:#a3abbd}
+.attendance-search-bar>b{font-size:13px;color:#0b59d0;white-space:nowrap}
+.attendance-search-clear{border:0;background:#eef2f8;border-radius:50%;width:22px;height:22px;padding:0;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.attendance-search-clear svg{width:13px;height:13px;color:#5b6479}
+
+/* 출석 현황: 회원별 상태 버튼 (현재 상태는 강조) */
+.attendance-roster-row .attendance-row-actions{grid-template-columns:repeat(4,1fr)}
+.attendance-roster-row .attendance-row-actions button{padding:6px 4px;font-size:12px;gap:3px}
+.attendance-roster-row .attendance-row-actions button.on{background:#0b59d0;border-color:#0b59d0;color:#fff}
+.attendance-roster-row .attendance-row-actions button.on svg{color:#fff}
+@media(max-width:720px){
+  .attendance-roster-row .attendance-row-actions{grid-template-columns:repeat(2,1fr)}
+}
+
 /* 출석 현황: 컬럼별 전체 선택 */
 .attendance-roster-column h3{display:flex;align-items:center;gap:8px}
 .attendance-col-selectall{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#3977ff;cursor:pointer;white-space:nowrap}

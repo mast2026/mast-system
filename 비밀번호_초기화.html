@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8">
+<title>MAST 비밀번호 초기화</title>
+<style>
+ body{font-family:-apple-system,'Apple SD Gothic Neo',sans-serif;max-width:720px;margin:48px auto;padding:0 24px;color:#1a1a2e}
+ h1{font-size:20px;margin:0 0 4px} p.sub{color:#666;font-size:14px;margin:0 0 24px;line-height:1.6}
+ input{padding:11px 14px;font-size:15px;border:1px solid #ccd;border-radius:8px;width:220px}
+ button{background:#1F3864;color:#fff;border:0;border-radius:8px;padding:11px 20px;font-size:14px;cursor:pointer;margin-left:8px}
+ button.reset{background:#c1121f;padding:7px 14px;font-size:13px;margin:0}
+ button:disabled{background:#aaa;cursor:default}
+ table{border-collapse:collapse;width:100%;margin-top:24px;font-size:14px}
+ th,td{border-bottom:1px solid #e5e7eb;padding:10px 8px;text-align:left}
+ th{background:#f5f6f8;font-weight:600}
+ .yes{color:#c1121f;font-weight:600} .no{color:#1a7f37;font-weight:600}
+ #msg{margin-top:16px;font-size:14px;white-space:pre-wrap}
+ .err{color:#c1121f} .ok{color:#1a7f37}
+</style>
+<h1>MAST 비밀번호 초기화</h1>
+<p class="sub">비밀번호를 잊어버린 회원을 검색해 초기화합니다.<br>
+초기화하면 그 회원은 다음 로그인 때 <b>첫 로그인</b>으로 새 비밀번호를 직접 설정하게 됩니다.</p>
+
+<input id="q" placeholder="이름 (예: 정세민)" autocomplete="off">
+<button id="go">검색</button>
+<div id="msg"></div>
+<table id="tb" hidden><thead><tr>
+  <th>이름</th><th>학교</th><th>기수</th><th>비밀번호</th><th></th>
+</tr></thead><tbody></tbody></table>
+
+<script>
+const U='https://forcmszeljtghqhfoinf.supabase.co';
+const K='sb_publishable_wfytwLaF_DnvGZspIovvww_ClEe4ELe';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+const msg=document.getElementById('msg'), tb=document.getElementById('tb');
+const say=(t,c)=>msg.innerHTML='<span class="'+(c||'')+'">'+t+'</span>';
+
+async function search(){
+  const name=document.getElementById('q').value.trim();
+  if(!name) return say('이름을 입력하세요.','err');
+  say('검색 중…'); tb.hidden=true;
+  const r=await fetch(U+'/rest/v1/team_matching_members?select=id,name,school,generation,password_hash&name=eq.'+encodeURIComponent(name)+'&order=id.asc',{headers:H});
+  if(!r.ok) return say('조회 실패 '+r.status+': '+await r.text(),'err');
+  const rows=await r.json();
+  if(!rows.length) return say('"'+name+'" 이름의 회원이 없습니다. 띄어쓰기까지 정확히 입력해 주세요.','err');
+  say(rows.length+'명 찾음');
+  const body=tb.querySelector('tbody'); body.innerHTML='';
+  rows.forEach(m=>{
+    const tr=document.createElement('tr');
+    const has=!!m.password_hash;
+    tr.innerHTML='<td>'+m.name+'</td><td>'+(m.school||'-')+'</td><td>'+m.generation+'기</td>'+
+      '<td class="'+(has?'yes':'no')+'">'+(has?'설정됨':'미설정 (첫 로그인 가능)')+'</td><td></td>';
+    if(has){
+      const b=document.createElement('button'); b.className='reset'; b.textContent='초기화';
+      b.onclick=async()=>{
+        if(!confirm(m.name+' ('+m.school+' '+m.generation+'기) 비밀번호를 초기화할까요?\n본인이 다시 첫 로그인으로 설정해야 합니다.')) return;
+        b.disabled=true; say('초기화 중…');
+        const res=await fetch(U+'/rest/v1/team_matching_members?id=eq.'+m.id,{method:'PATCH',
+          headers:{...H,Prefer:'return=representation'},
+          body:JSON.stringify({password_hash:null,password_set_at:null})});
+        const t=await res.text();
+        if(!res.ok){ b.disabled=false; return say('초기화 실패 '+res.status+': '+t,'err'); }
+        say('✅ '+m.name+' 초기화 완료. 이제 로그인 화면에서 첫 로그인으로 새 비밀번호를 설정하면 됩니다.','ok');
+        search();
+      };
+      tr.lastElementChild.appendChild(b);
+    }
+    body.appendChild(tr);
+  });
+  tb.hidden=false;
+}
+document.getElementById('go').onclick=search;
+document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')search()});
+</script>
+</html>
