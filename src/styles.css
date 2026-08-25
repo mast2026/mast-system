@@ -5638,6 +5638,7 @@ svg.login-v2-wave{bottom:-17px!important}
 
 .contest-hero-summary small{
   color:var(--surface-soft);
+  white-space:nowrap;
   word-break:keep-all;
 }
 

@@ -120,7 +120,7 @@ export default function ContestsScreen() {
       <div className="contest-hero-summary" aria-label={`모집 중인 공모전 ${contests.length}개`}>
         <span>{isClosedPreview ? '프리뷰' : '모집 중'}</span>
         <strong>{contests.length}</strong>
-        <small>{nearestContest ? `가장 빠른 마감 ${deadlineBadge(nearestContest.days, false)}` : '새 공고를 기다리는 중'}</small>
+        <small>{nearestContest ? `최단 마감 ${deadlineBadge(nearestContest.days, false)}` : '새 공고를 기다리는 중'}</small>
       </div>
     </section>
 
