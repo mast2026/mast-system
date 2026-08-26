@@ -33,6 +33,7 @@ const CLOSED_PREVIEW_CONTESTS = [
     max_team_size: 5,
     link: '',
     status: 'closed',
+    recruitmentRoleTags: ['마케팅', '콘텐츠 기획', '디자인'],
     previewNotice: '접수가 마감된 공모전 예시입니다. 결과 등록 후 동료평가 흐름을 확인하는 용도예요.',
   },
   {
@@ -46,6 +47,7 @@ const CLOSED_PREVIEW_CONTESTS = [
     max_team_size: 6,
     link: '',
     status: 'finished',
+    recruitmentRoleTags: ['서비스 기획', '데이터 분석'],
     previewNotice: '결과 발표까지 지난 완료 상태 예시입니다.',
   },
 ]
