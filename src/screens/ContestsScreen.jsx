@@ -5,7 +5,6 @@ import ContestThumbnail from '../components/ContestThumbnail'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import useQuery from '../hooks/useQuery'
 import { contestDeadlineEnd, getActiveContests, isContestRolling } from '../services/contestService'
-import { getRecruitingTeamRoleTagsByContest } from '../services/teamService'
 import { formatDate, pick, safeHttpUrl } from '../utils/display'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -33,7 +32,6 @@ const CLOSED_PREVIEW_CONTESTS = [
     max_team_size: 5,
     link: '',
     status: 'closed',
-    recruitmentRoleTags: ['마케팅', '콘텐츠 기획', '디자인'],
     previewNotice: '접수가 마감된 공모전 예시입니다. 결과 등록 후 동료평가 흐름을 확인하는 용도예요.',
   },
   {
@@ -47,7 +45,6 @@ const CLOSED_PREVIEW_CONTESTS = [
     max_team_size: 6,
     link: '',
     status: 'finished',
-    recruitmentRoleTags: ['서비스 기획', '데이터 분석'],
     previewNotice: '결과 발표까지 지난 완료 상태 예시입니다.',
   },
 ]
@@ -82,21 +79,17 @@ function deadlineBadge(days, isClosed, isRolling) {
   return `D-${days}`
 }
 
+function recommendationHashtags(description) {
+  const matches = String(description || '').match(/#[^#\s]+/g) ?? []
+  return [...new Set(matches)].slice(0, 4)
+}
+
 export default function ContestsScreen() {
   const [searchParams] = useSearchParams()
   const [deadlineFilter, setDeadlineFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState('deadline-asc')
   const isClosedPreview = searchParams.get('preview') === 'closed'
-  const query = useQuery(async () => {
-    const [activeContests, roleTagsByContest] = await Promise.all([
-      getActiveContests(),
-      getRecruitingTeamRoleTagsByContest(),
-    ])
-    return activeContests.map((contest) => ({
-      ...contest,
-      recruitmentRoleTags: roleTagsByContest[String(contest.id)] ?? [],
-    }))
-  }, [])
+  const query = useQuery(getActiveContests, [])
   const contests = isClosedPreview ? CLOSED_PREVIEW_CONTESTS : (query.data || EMPTY_CONTESTS)
 
   const visibleContests = useMemo(() => {
@@ -152,6 +145,7 @@ export default function ContestsScreen() {
           const isRolling = isContestRolling(contest)
           const remainingDays = daysUntilDeadline(contest)
           const isUrgent = !isClosed && remainingDays !== null && remainingDays <= 7
+          const recommendationTags = recommendationHashtags(contest.description)
           return <article className={`contest-directory-card${isUrgent ? ' is-urgent' : ''}`} key={contest.id}>
             <div className="contest-card-main">
               <div className="contest-card-copy">
@@ -165,8 +159,8 @@ export default function ContestsScreen() {
               <ContestThumbnail id={contest.id} title={contest.title} category={contest.category} />
             </div>
 
-            {!!contest.recruitmentRoleTags?.length && <div className="contest-recruitment-tags" aria-label="팀 모집 해시태그">
-              {contest.recruitmentRoleTags.map((tag) => <span key={tag}>#{tag}</span>)}
+            {!!recommendationTags.length && <div className="contest-recommendation-tags" aria-label="공모전 추천 해시태그">
+              {recommendationTags.map((tag) => <span key={tag}>{tag}</span>)}
             </div>}
 
             {contest.previewNotice && <p className="contest-preview-note">{contest.previewNotice}</p>}

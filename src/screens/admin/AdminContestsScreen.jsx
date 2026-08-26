@@ -229,7 +229,10 @@ function ContestForm({ initial, onSubmit, onCancel, busy }) {
       <Field label="최대 팀원 수" required><input type="number" min="1" value={form.max_team_size} onChange={(event) => set('max_team_size', event.target.value)} required /></Field>
       <Field label="시상 수"><input value={form.award_count || ''} onChange={(event) => set('award_count', event.target.value)} placeholder="예: 대상 1팀, 우수상 2팀" /></Field>
     </div>
-    <Field label="설명"><textarea value={form.description || ''} onChange={(event) => set('description', event.target.value)} /></Field>
+    <Field label="설명 및 추천 해시태그">
+      <textarea value={form.description || ''} onChange={(event) => set('description', event.target.value)} placeholder="설명과 함께 #AI추천 #마케팅초보 같은 태그를 입력하세요." />
+      <small>#으로 시작한 단어는 회원 공모전 목록 카드에 추천 태그로 표시됩니다.</small>
+    </Field>
     <Field label="공모전 링크"><input type="url" value={form.link || ''} onChange={(event) => set('link', event.target.value)} /></Field>
     <Field label="추가 정보"><textarea rows="5" value={form.notes || ''} onChange={(event) => set('notes', event.target.value)} placeholder="참가 자격, 평가 기준, 제출 형식, 지식재산권, 수상 후 의무사항 등" /></Field>
     <div className="check-grid">

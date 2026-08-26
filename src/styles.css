@@ -5846,13 +5846,13 @@ svg.login-v2-wave{bottom:-17px!important}
   -webkit-box-orient:vertical;
 }
 
-.contest-recruitment-tags{
+.contest-recommendation-tags{
   display:flex;
   flex-wrap:wrap;
   gap:var(--space-1);
 }
 
-.contest-recruitment-tags span{
+.contest-recommendation-tags span{
   padding:var(--space-1) var(--space-2);
   border:1px solid var(--border-default);
   border-radius:var(--space-2);
