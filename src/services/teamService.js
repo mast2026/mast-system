@@ -28,6 +28,24 @@ const activeLink = (link, hasStatus) => !hasStatus || link.status === 'active'
 const withoutChat = (team) => { const { open_chat_url: _private, ...safe } = team; return safe }
 
 export async function getRecruitingTeams() { return getEnrichedTeams({ recruitingOnly: true }) }
+export async function getRecruitingTeamRoleTagsByContest() {
+  const { data, error } = await requireSupabase()
+    .from(TABLES.teams)
+    .select('contest_id,needed_roles')
+    .eq('status', 'recruiting')
+  throwIfError(error)
+
+  const tagsByContest = new Map()
+  ;(data ?? []).forEach((team) => {
+    const contestId = String(team.contest_id)
+    const currentTags = tagsByContest.get(contestId) ?? []
+    const nextTags = Array.isArray(team.needed_roles)
+      ? team.needed_roles.map((tag) => String(tag).trim()).filter(Boolean)
+      : []
+    tagsByContest.set(contestId, [...new Set([...currentTags, ...nextTags])].slice(0, 4))
+  })
+  return Object.fromEntries(tagsByContest)
+}
 export async function getEnrichedTeams({ recruitingOnly = false } = {}) {
   const client = requireSupabase(); let teamsQuery = client.from(TABLES.teams).select(TEAM_PUBLIC_FIELDS).order('id', { ascending: false })
   if (recruitingOnly) teamsQuery = teamsQuery.eq('status', 'recruiting')

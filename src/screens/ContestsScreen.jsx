@@ -5,6 +5,7 @@ import ContestThumbnail from '../components/ContestThumbnail'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import useQuery from '../hooks/useQuery'
 import { contestDeadlineEnd, getActiveContests, isContestRolling } from '../services/contestService'
+import { getRecruitingTeamRoleTagsByContest } from '../services/teamService'
 import { formatDate, pick, safeHttpUrl } from '../utils/display'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -84,7 +85,16 @@ export default function ContestsScreen() {
   const [deadlineFilter, setDeadlineFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState('deadline-asc')
   const isClosedPreview = searchParams.get('preview') === 'closed'
-  const query = useQuery(getActiveContests, [])
+  const query = useQuery(async () => {
+    const [activeContests, roleTagsByContest] = await Promise.all([
+      getActiveContests(),
+      getRecruitingTeamRoleTagsByContest(),
+    ])
+    return activeContests.map((contest) => ({
+      ...contest,
+      recruitmentRoleTags: roleTagsByContest[String(contest.id)] ?? [],
+    }))
+  }, [])
   const contests = isClosedPreview ? CLOSED_PREVIEW_CONTESTS : (query.data || EMPTY_CONTESTS)
 
   const visibleContests = useMemo(() => {
@@ -152,6 +162,10 @@ export default function ContestsScreen() {
               </div>
               <ContestThumbnail id={contest.id} title={contest.title} category={contest.category} />
             </div>
+
+            {!!contest.recruitmentRoleTags?.length && <div className="contest-recruitment-tags" aria-label="팀 모집 해시태그">
+              {contest.recruitmentRoleTags.map((tag) => <span key={tag}>#{tag}</span>)}
+            </div>}
 
             {contest.previewNotice && <p className="contest-preview-note">{contest.previewNotice}</p>}
 

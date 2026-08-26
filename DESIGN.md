@@ -73,9 +73,9 @@ Base unit은 4px이다.
 - **Layout**: 모든 화면에서 왼쪽부터 전체, 7일 이내, 30일 이내, 정렬 순의 한 행 cluster. 공간이 부족할 때만 해당 행 자체가 가로 스크롤된다.
 
 ### Contest Directory Card
-- **Structure**: 상태·D-day, 제목·기관, 핵심 정보, 대표 이미지, 팀 모집/공고 링크.
+- **Structure**: 상태·D-day, 제목·기관, 모집 중인 팀의 역할 해시태그(최대 4개), 핵심 정보, 대표 이미지, 팀 모집/공고 링크.
 - **Variants**: 모집 중, 마감 임박, 마감 프리뷰, 대표 이미지 없음.
-- **States**: 기본, hover, active, focus-within, 이미지 로딩/성공/오류, 비활성 링크.
+- **States**: 기본, 모집 해시태그 있음/없음, hover, active, focus-within, 이미지 로딩/성공/오류, 비활성 링크.
 - **Accessibility**: 제목과 링크 이름이 목적을 설명하고, 썸네일 alt는 공모전명을 포함하며 대체 비주얼은 장식으로 처리한다.
 - **Layout**: 카드 내부 sidebar primitive. 콘텐츠가 길어도 버튼은 카드 하단에 정렬한다.
 
