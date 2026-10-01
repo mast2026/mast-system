@@ -5,6 +5,7 @@ import AppErrorBoundary from './components/AppErrorBoundary'
 import AppLayout from './components/AppLayout'
 import AdminLayout from './components/AdminLayout'
 import LoginScreen from './screens/LoginScreen'
+import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import AdminLoginScreen from './screens/AdminLoginScreen'
 import HomeScreen from './screens/HomeScreen'
 import PromotionLegacyScreen from './screens/PromotionLegacyScreen'
@@ -89,6 +90,7 @@ function ManifestSwitcher() {
 function AppRoutes() {
   return <><ManifestSwitcher /><Routes>
     <Route path="/login" element={<LoginEntry />} />
+    <Route path="/reset-password" element={<ResetPasswordScreen />} />
     <Route path="/admin-login" element={<AdminLoginEntry />} />
 
     <Route element={<MemberRoute />}>

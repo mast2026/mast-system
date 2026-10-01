@@ -4,6 +4,10 @@ React + Vite와 기존 Supabase `team_matching_*` 테이블만 사용하는 팀�
 
 ## 시작하기
 
+비밀번호 재설정은 로그인 화면의 `비밀번호를 잊으셨나요?`에서 운영진에게 문의합니다. 전체 관리자는 회원 상세에서 본인 확인 후 관리자 코드를 다시 입력하고 재설정 링크를 발급할 수 있습니다. 링크는 30분 동안 한 번만 사용할 수 있으며, 재발급하면 이전 링크는 무효화됩니다. 새 비밀번호 저장 전에는 기존 비밀번호와 회원 활동 데이터가 유지됩니다.
+
+배포 전에 연결된 Supabase 프로젝트에 `supabase/member-password-reset.sql`을 적용합니다. `supabase/member-password-reset.test.sql`은 전체 트랜잭션을 롤백하면서 만료, 재사용, 비밀번호 변경 후 링크 무효화, 토큰 테이블 접근 제한을 검증합니다. 프런트엔드 검증은 `npm test`와 `npm run build`로 실행합니다.
+
 ```bash
 cp .env.example .env
 npm install

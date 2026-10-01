@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { CalendarCheck, Check, ChevronRight, Home, Megaphone, ShieldCheck, SlidersHorizontal, Trash2, Trophy } from 'lucide-react'
 import ActivityWeatherIcon from '../../components/ActivityWeatherIcon'
 import Modal from '../../components/Modal'
+import MemberPasswordReset from '../../components/MemberPasswordReset'
 import { Field, FormActions } from '../../components/FormControls'
 import { ErrorState, LoadingState } from '../../components/States'
 import useQuery from '../../hooks/useQuery'
@@ -160,6 +161,7 @@ export default function AdminMembersScreen() {
 }
 
 function MemberDetailModal({ member, onClose, onSaved, onScoreChanged }) {
+  const { isFullAdmin } = useAuth()
   const initialExecPosition = parseExecPosition(member.position_title)
   const [name, setName] = useState(member.name || '')
   const [school, setSchool] = useState(member.school || '')
@@ -292,6 +294,7 @@ function MemberDetailModal({ member, onClose, onSaved, onScoreChanged }) {
       </section>
 
       <form className="data-form" onSubmit={save}>
+        {isFullAdmin && <MemberPasswordReset key={member.id} member={member} />}
         <Field label="이름">
           <input value={name} onChange={(event) => setName(event.target.value)} />
         </Field>

@@ -178,6 +178,8 @@ export default function LoginScreen() {
         </button>
       </form>
 
+      <Link className="login-v2-alt-btn solo" to="/reset-password">비밀번호를 잊으셨나요?</Link>
+
       <div className="login-v2-divider"><span>또는</span></div>
 
       <Link className="login-v2-alt-btn solo" to="/admin-login">
