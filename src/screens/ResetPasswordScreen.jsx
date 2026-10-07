@@ -1,20 +1,42 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { completePasswordReset } from '../services/passwordResetService'
+import { completePasswordReset, requestPasswordReset } from '../services/passwordResetService'
 import { resetTokenFromHash } from '../utils/passwordReset'
 import { useAuth } from '../context/AuthContext'
 import './password-reset.css'
+
+const EMPTY_IDENTITY = { name: '', school: '', generation: '', major: '', phone: '' }
 
 export default function ResetPasswordScreen() {
   const { logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const token = resetTokenFromHash(location.hash)
+  const linkToken = resetTokenFromHash(location.hash)
+  const [verifiedToken, setVerifiedToken] = useState('')
+  const token = linkToken || verifiedToken
+  const [identity, setIdentity] = useState(EMPTY_IDENTITY)
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+
+  const updateIdentity = (key, value) => setIdentity((prev) => ({ ...prev, [key]: value }))
+
+  const verify = async (event) => {
+    event.preventDefault()
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      const result = await requestPasswordReset(identity)
+      setVerifiedToken(result.token)
+    } catch (err) {
+      setError(err.message || '본인 확인에 실패했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const submit = async (event) => {
     event.preventDefault()
@@ -27,7 +49,7 @@ export default function ResetPasswordScreen() {
       setPassword('')
       setConfirmation('')
       setDone(true)
-      navigate('/reset-password', { replace: true })
+      if (linkToken) navigate('/reset-password', { replace: true })
     } catch (err) {
       setError(err.message || '비밀번호 변경에 실패했습니다.')
     } finally {
@@ -42,7 +64,7 @@ export default function ResetPasswordScreen() {
         <p>새 비밀번호로 로그인해 주세요. 기존 활동과 팀 정보는 그대로 유지됩니다.</p>
         <Link className="button primary" to="/login">로그인하기</Link>
       </> : token ? <>
-        <p>새 비밀번호를 입력해 주세요. 이 링크는 발급 후 30분 동안 한 번만 사용할 수 있어요.</p>
+        <p>새 비밀번호를 입력해 주세요.{linkToken ? ' 이 링크는 발급 후 30분 동안 한 번만 사용할 수 있어요.' : ''}</p>
         <form className="data-form" onSubmit={submit}>
           <label>새 비밀번호<input type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} maxLength={128} required disabled={busy} /></label>
           <small>영문과 숫자를 포함해 8자 이상 입력해 주세요.</small>
@@ -51,8 +73,17 @@ export default function ResetPasswordScreen() {
           <button className="button primary" disabled={busy}>{busy ? '변경 중...' : '새 비밀번호 저장'}</button>
         </form>
       </> : <>
-        <p>운영진에게 이름, 학교, 기수를 알려주고 비밀번호 재설정 링크를 요청해 주세요. 본인 확인 후 링크를 안내해 드립니다.</p>
-        <p>받은 링크를 열면 새 비밀번호를 설정할 수 있어요.</p>
+        <p>가입할 때 적은 정보로 본인을 확인하고 바로 새 비밀번호를 설정할 수 있어요.</p>
+        <form className="data-form" onSubmit={verify}>
+          <label>이름<input value={identity.name} onChange={(event) => updateIdentity('name', event.target.value)} autoComplete="name" required disabled={busy} /></label>
+          <label>학교<input value={identity.school} onChange={(event) => updateIdentity('school', event.target.value)} autoComplete="organization" placeholder="예: 인하대학교" required disabled={busy} /></label>
+          <label>기수<input value={identity.generation} onChange={(event) => updateIdentity('generation', event.target.value)} inputMode="numeric" placeholder="예: 3" required disabled={busy} /></label>
+          <label>전화번호<input value={identity.phone} onChange={(event) => updateIdentity('phone', event.target.value)} inputMode="tel" autoComplete="tel" placeholder="가입 시 등록한 전화번호" disabled={busy} /></label>
+          <label>전공<input value={identity.major} onChange={(event) => updateIdentity('major', event.target.value)} placeholder="가입 시 등록한 전공" disabled={busy} /></label>
+          <small>등록된 전화번호·전공이 정확히 일치해야 확인됩니다. 하나만 등록했다면 그 항목만 입력하면 됩니다. 둘 다 등록되지 않았다면 운영진에게 문의해 주세요.</small>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="button primary" disabled={busy}>{busy ? '확인 중...' : '본인 확인하고 재설정'}</button>
+        </form>
       </>}
       {!done && <Link className="password-reset-back" to="/login">로그인으로 돌아가기</Link>}
     </section>
