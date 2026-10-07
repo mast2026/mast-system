@@ -11,15 +11,17 @@ export async function issuePasswordReset(memberId, adminCode) {
   return { link: buildPasswordResetLink(window.location.origin, data.token), expiresAt: data.expires_at }
 }
 
-export async function requestPasswordReset({ name, school, generation, major, phone }) {
+export async function requestPasswordReset({ name, school, generation, phone }) {
   if (!String(name).trim() || !String(school).trim() || !String(generation).trim()) {
     throw new Error('이름, 학교, 기수를 입력해 주세요.')
+  }
+  if (!String(phone ?? '').replace(/[^0-9]/g, '')) {
+    throw new Error('가입할 때 적은 전화번호를 입력해 주세요.')
   }
   const { data, error } = await requireSupabase().rpc('request_member_password_reset', {
     p_name: String(name).trim(),
     p_school: String(school).trim(),
     p_generation: String(generation).trim(),
-    p_major: String(major ?? '').trim(),
     p_phone: String(phone ?? '').trim(),
   })
   throwIfError(error)

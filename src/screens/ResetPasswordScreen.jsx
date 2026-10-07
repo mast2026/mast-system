@@ -5,7 +5,7 @@ import { resetTokenFromHash } from '../utils/passwordReset'
 import { useAuth } from '../context/AuthContext'
 import './password-reset.css'
 
-const EMPTY_IDENTITY = { name: '', school: '', generation: '', major: '', phone: '' }
+const EMPTY_IDENTITY = { name: '', school: '', generation: '', phone: '' }
 
 export default function ResetPasswordScreen() {
   const { logout } = useAuth()
@@ -73,14 +73,13 @@ export default function ResetPasswordScreen() {
           <button className="button primary" disabled={busy}>{busy ? '변경 중...' : '새 비밀번호 저장'}</button>
         </form>
       </> : <>
-        <p>가입할 때 적은 정보로 본인을 확인하고 바로 새 비밀번호를 설정할 수 있어요.</p>
+        <p>이름·학교·기수와 가입할 때 적은 전화번호로 본인을 확인하면 바로 새 비밀번호를 설정할 수 있어요.</p>
         <form className="data-form" onSubmit={verify}>
           <label>이름<input value={identity.name} onChange={(event) => updateIdentity('name', event.target.value)} autoComplete="name" required disabled={busy} /></label>
           <label>학교<input value={identity.school} onChange={(event) => updateIdentity('school', event.target.value)} autoComplete="organization" placeholder="예: 인하대학교" required disabled={busy} /></label>
           <label>기수<input value={identity.generation} onChange={(event) => updateIdentity('generation', event.target.value)} inputMode="numeric" placeholder="예: 3" required disabled={busy} /></label>
-          <label>전화번호<input value={identity.phone} onChange={(event) => updateIdentity('phone', event.target.value)} inputMode="tel" autoComplete="tel" placeholder="가입 시 등록한 전화번호" disabled={busy} /></label>
-          <label>전공<input value={identity.major} onChange={(event) => updateIdentity('major', event.target.value)} placeholder="가입 시 등록한 전공" disabled={busy} /></label>
-          <small>등록된 전화번호·전공이 정확히 일치해야 확인됩니다. 하나만 등록했다면 그 항목만 입력하면 됩니다. 둘 다 등록되지 않았다면 운영진에게 문의해 주세요.</small>
+          <label>전화번호<input value={identity.phone} onChange={(event) => updateIdentity('phone', event.target.value)} inputMode="tel" autoComplete="tel" placeholder="가입할 때 적은 전화번호" required disabled={busy} /></label>
+          <small>등록된 전화번호가 없는 회원은 운영진에게 문의해 주세요.</small>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="button primary" disabled={busy}>{busy ? '확인 중...' : '본인 확인하고 재설정'}</button>
         </form>
