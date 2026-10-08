@@ -19,7 +19,17 @@ export function AuthProvider({ children }) {
   // 명시적 로그인: 푸시 구독 연결 + 허용 요청(앱을 닫아도 알림 받기)
   const login = (nextMember) => { applyMember(nextMember); promptPushPermission() }
   const logout = () => { logoutPushUser(); localStorage.removeItem(STORAGE_KEY); setMember(null) }
-  useEffect(() => { if (member?.id) { identifyPushUser(member); getMember(member.id).then((latest) => latest && applyMember(latest)).catch(() => {}) } }, [member?.id])
+  useEffect(() => {
+    if (!member?.id) return
+    let cancelled = false
+    identifyPushUser(member)
+    getMember(member.id).then((latest) => {
+      if (cancelled) return
+      if (latest) applyMember(latest)
+      else logout()
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [member?.id])
   const isFullAdmin = ['admin', 'manager', 'professor'].includes(member?.role)
   const isProfessor = member?.role === 'professor'
   const adminSections = normalizeSections(member?.admin_sections)

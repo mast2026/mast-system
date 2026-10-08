@@ -5,7 +5,7 @@ declare
   v_result jsonb;
   v_name text;
 begin
-  select * into v_member from public.team_matching_members where role = 'member' order by id limit 1 for update;
+  select * into v_member from public.team_matching_members where role = 'member' and roster_status = 'active' order by id limit 1 for update;
   assert found, 'member fixture required';
   v_name := v_member.name;
   update public.team_matching_members set phone = '010-1234-5678' where id = v_member.id;

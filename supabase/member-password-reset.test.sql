@@ -12,7 +12,7 @@ declare
   v_second_link jsonb;
 begin
   select id, password_hash into v_member_id, v_original_hash
-    from public.team_matching_members where role = 'member' order by id limit 1 for update;
+    from public.team_matching_members where role = 'member' and roster_status = 'active' order by id limit 1 for update;
   assert v_member_id is not null, 'A member fixture is required';
   v_token_hash := encode(extensions.digest(v_token, 'sha256'), 'hex');
 

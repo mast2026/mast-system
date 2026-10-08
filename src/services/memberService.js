@@ -1,6 +1,6 @@
-import { TABLES, requireSupabase, selectOne, throwIfError } from './baseService'
+import { TABLES, requireSupabase, throwIfError } from './baseService'
 
-const PUBLIC_MEMBER_FIELDS = 'id,mast_member_id,name,school,major,generation,role,is_leader,position_title,created_at,updated_at'
+const PUBLIC_MEMBER_FIELDS = 'id,mast_member_id,name,school,major,generation,role,is_leader,position_title,created_at,updated_at,roster_status,roster_number,instagram_handle,is_officer'
 const ADMIN_ROLES = ['admin', 'manager', 'professor']
 let passwordCapabilityPromise
 
@@ -57,13 +57,15 @@ async function detectPasswordCapabilities() {
 }
 
 export async function getMembers() {
-  const { data, error } = await requireSupabase().from(TABLES.members).select(PUBLIC_MEMBER_FIELDS).order('id', { ascending: true })
+  const { data, error } = await requireSupabase().from(TABLES.members).select(PUBLIC_MEMBER_FIELDS).eq('roster_status', 'active').order('id', { ascending: true })
   throwIfError(error)
   return attachAdminSections(data ?? [])
 }
 
 export async function getMember(id) {
-  return attachAdminSections(await selectOne(TABLES.members, id))
+  const { data, error } = await requireSupabase().from(TABLES.members).select(PUBLIC_MEMBER_FIELDS).eq('id', id).in('roster_status', ['active', 'system']).maybeSingle()
+  throwIfError(error)
+  return attachAdminSections(data)
 }
 
 export async function findMemberByName(name) {
@@ -73,7 +75,7 @@ export async function findMemberByName(name) {
 
 // 같은 이름의 회원이 여러 명(동명이인)일 수 있으므로 전부 반환합니다.
 export async function findMembersByName(name) {
-  const { data: members, error } = await requireSupabase().from(TABLES.members).select(PUBLIC_MEMBER_FIELDS).order('id', { ascending: true })
+  const { data: members, error } = await requireSupabase().from(TABLES.members).select(PUBLIC_MEMBER_FIELDS).eq('roster_status', 'active').order('id', { ascending: true })
   throwIfError(error)
   const rows = await attachAdminSections(members ?? [])
   const keyword = String(name ?? '').trim().toLocaleLowerCase()
