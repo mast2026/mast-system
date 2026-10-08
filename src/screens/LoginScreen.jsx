@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Eye, EyeOff, GraduationCap, Lock, Megaphone, ShieldCheck, Trophy, UserRound, Users } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { checkHasPassword, getMembers, loginFirstTime, loginWithPassword } from '../services/memberService'
-import useQuery from '../hooks/useQuery'
+import { findMembersByName, loginFirstTime, loginWithPassword } from '../services/memberService'
 import LoadingCloud from '../components/common/LoadingCloud'
 
 const memberLoginMode = { label: '회원', roles: null, next: '/' }
@@ -42,8 +41,20 @@ export default function LoginScreen() {
   const [message, setMessage] = useState('')
   const [info, setInfo] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [hasPassword, setHasPassword] = useState(null)
-  const { data, loading, error } = useQuery(getMembers, [], { initialData: [] })
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [phone, setPhone] = useState('')
+  useEffect(() => {
+    let cancelled = false
+    setData([]); setError(null)
+    if (name.trim().length < 2) { setLoading(false); return }
+    setLoading(true)
+    const timer = setTimeout(() => {
+      findMembersByName(name).then(rows => { if (!cancelled) setData(rows) }).catch(e => { if (!cancelled) setError(e) }).finally(() => { if (!cancelled) setLoading(false) })
+    }, 350)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [name])
   const modeConfig = memberLoginMode
   const members = useMemo(() => {
     const list = data ?? []
@@ -68,11 +79,7 @@ export default function LoginScreen() {
     return sameNameCount === 1 ? sameNameMembers[0] : null
   }, [sameNameMembers, sameNameCount, pickedId])
 
-  useEffect(() => {
-    if (!selectedMember) { setHasPassword(null); return }
-    setHasPassword(null)
-    checkHasPassword(selectedMember.id).then(setHasPassword).catch(() => setHasPassword(false))
-  }, [selectedMember?.id])
+  const hasPassword = selectedMember ? selectedMember.has_password : null
 
   const isFirstLogin = selectedMember && hasPassword === false
   const isCheckingPw = selectedMember && hasPassword === null
@@ -88,7 +95,7 @@ export default function LoginScreen() {
       if (isCheckingPw) throw new Error('계정 정보를 확인 중입니다. 잠시 후 다시 눌러 주세요.')
       const withTimeout = (p) => Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Error('DB 연결을 확인해 주세요.')), 8000))])
       // 고른 회원으로 후보를 좁혀, 동명이인이 서로의 계정으로 로그인되는 것을 막습니다.
-      const opts = { roles: modeConfig.roles, memberId: selectedMember.id }
+      const opts = { roles: modeConfig.roles, memberId: selectedMember.id, phone }
       const tryPassword = () => withTimeout(loginWithPassword(name, password, opts))
       const tryFirst = () => withTimeout(loginFirstTime(name, school, generation, password, confirmPassword, opts))
       let member
@@ -161,9 +168,11 @@ export default function LoginScreen() {
           </div>
         </>)}
 
-        <PasswordField value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호를 입력하세요" autoComplete={isFirstLogin ? 'new-password' : 'current-password'} minLength={4} required />
+        {isFirstLogin && <div className="login-input"><UserRound className="login-input-icon" /><input value={phone} onChange={e => setPhone(e.target.value)} placeholder="가입할 때 적은 전화번호" autoComplete="tel" required /></div>}
 
-        {isFirstLogin && <PasswordField value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="비밀번호를 한 번 더 입력" autoComplete="new-password" minLength={4} required />}
+        <PasswordField value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호를 입력하세요" autoComplete={isFirstLogin ? 'new-password' : 'current-password'} minLength={isFirstLogin ? 8 : 4} required />
+
+        {isFirstLogin && <PasswordField value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="비밀번호를 한 번 더 입력" autoComplete="new-password" minLength={isFirstLogin ? 8 : 4} required />}
 
         {name.trim() && !sameNameCount && !loading && <div className="login-v2-note warning">회원 목록에서 같은 이름을 찾지 못했어요. 이름을 정확히 입력해 주세요.</div>}
         {needsPick && <div className="login-v2-note">같은 이름의 회원이 여러 명이에요. 위에서 본인 학교·기수를 선택해 주세요.</div>}

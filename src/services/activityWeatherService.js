@@ -1,3 +1,4 @@
+import { LEGACY_MEMBER_FIELDS } from './baseService'
 import { requireSupabase, TABLES } from './baseService'
 import { ACTIVITY_WEATHER_PRESETS, calculateActivityWeather, calculateWeatherFromEvents, WEATHER_BASE_SCORE, OFFLINE_EVENT_TYPES, OFFLINE_TARGET_POINTS } from '../utils/activityWeather'
 import { findAttendanceMember } from './attendanceService'
@@ -324,7 +325,7 @@ export async function getAllActivityWeather(members) {
     supabase.from(TABLES.scoreEvents).select('*').eq('verified', true),
     supabase.from('activity_attendance_records').select('*'),
     supabase.from('activity_sessions').select('id,title,is_orientation'),
-    supabase.from('members').select('*'),
+    supabase.from('members').select(LEGACY_MEMBER_FIELDS),
     supabase.from('promotion_mission_assignments').select('id,mission_id,member_id,status'),
     supabase.from('promotion_missions').select('id,title,due_at'),
     supabase.from(TABLES.teams).select('id,contest_id,leader_id,introduction,status'),

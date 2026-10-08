@@ -1,4 +1,4 @@
-import { TABLES, requireSupabase, throwIfError } from './baseService'
+import { MEMBER_FIELDS, TABLES, requireSupabase, throwIfError } from './baseService'
 import { canCreateTeamForContest, parseLeaderApplicationContestId } from './leaderService'
 import { isContestOpen } from './contestService'
 import { getAdminNotificationRecipientIds, sendOneSignalPush } from './notificationService'
@@ -31,7 +31,7 @@ export async function getRecruitingTeams() { return getEnrichedTeams({ recruitin
 export async function getEnrichedTeams({ recruitingOnly = false } = {}) {
   const client = requireSupabase(); let teamsQuery = client.from(TABLES.teams).select(TEAM_PUBLIC_FIELDS).order('id', { ascending: false })
   if (recruitingOnly) teamsQuery = teamsQuery.eq('status', 'recruiting')
-  const [{ data: teams, error }, { data: contests, error: contestError }, { data: members, error: memberError }, { data: teamLinks, error: linksError }] = await Promise.all([teamsQuery, client.from(TABLES.contests).select('*'), client.from(TABLES.members).select('*'), client.from(TABLES.teamMembers).select('team_id,member_id,status')])
+  const [{ data: teams, error }, { data: contests, error: contestError }, { data: members, error: memberError }, { data: teamLinks, error: linksError }] = await Promise.all([teamsQuery, client.from(TABLES.contests).select('*'), client.from(TABLES.members).select(MEMBER_FIELDS), client.from(TABLES.teamMembers).select('team_id,member_id,status')])
   throwIfError(error || contestError || memberError || linksError); const contestsById = new Map((contests ?? []).map((x) => [x.id, x])); const membersById = new Map((members ?? []).map((x) => [x.id, x]))
   return (teams ?? [])
     .map(withoutChat)
@@ -42,7 +42,7 @@ export async function getEnrichedTeams({ recruitingOnly = false } = {}) {
 export async function getTeamDetail(teamId, viewerId) {
   const client = requireSupabase(); const capabilities = await detectTeamCapabilities(); const membershipFields = capabilities.membershipStatus ? 'id,team_id,member_id,status' : 'id,team_id,member_id'
   const [{ data: team, error }, { data: links, error: linkError }, { data: members, error: memberError }] = await Promise.all([
-    client.from(TABLES.teams).select(TEAM_PUBLIC_FIELDS).eq('id', teamId).maybeSingle(), client.from(TABLES.teamMembers).select(membershipFields).eq('team_id', teamId), client.from(TABLES.members).select('*'),
+    client.from(TABLES.teams).select(TEAM_PUBLIC_FIELDS).eq('id', teamId).maybeSingle(), client.from(TABLES.teamMembers).select(membershipFields).eq('team_id', teamId), client.from(TABLES.members).select(MEMBER_FIELDS),
   ])
   throwIfError(error || linkError || memberError); if (!team) return null
   const membersById = new Map((members ?? []).map((x) => [x.id, x])); const activeLinks = (links ?? []).filter((link) => activeLink(link, capabilities.membershipStatus))

@@ -1,7 +1,7 @@
 import { getAllActivityWeather } from './activityWeatherService'
 import { classifyAttendance } from './attendanceService'
 import { sendOneSignalPush } from './notificationService'
-import { TABLES, requireSupabase, throwIfError } from './baseService'
+import { safeFields, readableTable, MEMBER_FIELDS, TABLES, requireSupabase, throwIfError } from './baseService'
 import { getMembers } from './memberService'
 import { deleteTeamPost, TEAM_PUBLIC_FIELDS } from './teamService'
 
@@ -101,7 +101,7 @@ export async function getAdminTeams() {
   const [{ data: teams, error }, { data: contests, error: contestError }, { data: members, error: memberError }, { data: teamMembers }, { data: applications }] = await Promise.all([
     client.from(TABLES.teams).select('*').order('id', { ascending: false }),
     client.from(TABLES.contests).select('*'),
-    client.from(TABLES.members).select('*'),
+    client.from(TABLES.members).select(MEMBER_FIELDS),
     client.from(TABLES.teamMembers).select('*'),
     client.from(TABLES.applications).select('*'),
   ])
@@ -232,7 +232,7 @@ export async function getLeaveRequests() {
   const client = requireSupabase()
   const [{ data: links, error }, { data: members }, { data: teams }, { data: contests }] = await Promise.all([
     client.from(TABLES.teamMembers).select('*').eq('status', 'leave_requested'),
-    client.from(TABLES.members).select('*'),
+    client.from(TABLES.members).select(MEMBER_FIELDS),
     client.from(TABLES.teams).select('*'),
     client.from(TABLES.contests).select('*'),
   ])
@@ -294,7 +294,7 @@ export async function getAdminApplications() {
     client.from(TABLES.applications).select('*').order('id', { ascending: false }),
     client.from(TABLES.teams).select(TEAM_PUBLIC_FIELDS),
     client.from(TABLES.contests).select('*'),
-    client.from(TABLES.members).select('*'),
+    client.from(TABLES.members).select(MEMBER_FIELDS),
   ])
   throwIfError(error)
   const teamsById = byId(teams)
@@ -417,11 +417,11 @@ export async function getMemberAdminSections() {
 
 export async function updateMemberAdminFields(memberId, patch) {
   const cleaned = clean(patch)
-  const { data, error } = await requireSupabase().from(TABLES.members).update(cleaned).eq('id', memberId).select('*').maybeSingle()
+  const { data, error } = await requireSupabase().from(TABLES.members).update(cleaned).eq('id', memberId).select(MEMBER_FIELDS).maybeSingle()
   // admin_sections 컬럼이 아직 없으면, 그 항목만 빼고 나머지는 정상 저장 (오류는 호출부에 알림)
   if (error && /admin_sections/.test(String(error.message)) && 'admin_sections' in cleaned) {
     const { admin_sections, ...rest } = cleaned
-    const retry = await requireSupabase().from(TABLES.members).update(rest).eq('id', memberId).select('*').maybeSingle()
+    const retry = await requireSupabase().from(TABLES.members).update(rest).eq('id', memberId).select(MEMBER_FIELDS).maybeSingle()
     throwIfError(retry.error)
     throw new Error('admin_sections 컬럼이 없어 권한은 저장되지 못했습니다. add-admin-sections.sql 을 실행해 주세요.')
   }
@@ -430,27 +430,9 @@ export async function updateMemberAdminFields(memberId, patch) {
 }
 
 export async function deleteAdminMember(memberId) {
-  const client = requireSupabase()
-  const id = Number(memberId)
-  // 외래키(FK) 제약으로 삭제가 거절되지 않도록 연결 데이터를 먼저 정리합니다. (있을 때만, 실패 무시)
-  await Promise.allSettled([
-    client.from(TABLES.applications).delete().eq('applicant_id', id),
-    client.from(TABLES.teamMembers).delete().eq('member_id', id),
-    client.from(TABLES.leaderApplications).delete().eq('member_id', id),
-    client.from(TABLES.notifications).delete().eq('member_id', id),
-    client.from(TABLES.scoreEvents).delete().eq('member_id', id),
-    client.from(TABLES.peerReviews).delete().eq('reviewer_id', id),
-    client.from(TABLES.peerReviews).delete().eq('reviewee_id', id),
-  ])
-  const { data, error } = await client.from(TABLES.members).delete().eq('id', id).select('id')
-  if (error) {
-    // 팀장으로 등록된 팀이 있으면 teams.leader_id FK 때문에 막힙니다.
-    if (/foreign key|violates|teams/i.test(String(error.message))) {
-      throw new Error('이 회원이 팀장으로 등록된 팀이 있어 삭제가 막혔습니다. 해당 팀을 먼저 삭제하거나 팀장을 변경한 뒤 다시 시도해 주세요.')
-    }
-    throw error
-  }
-  assertDeleted(data)
+  const { data, error } = await requireSupabase().rpc('mast_archive_member', { p_member_id: Number(memberId) })
+  throwIfError(error)
+  if (!data?.ok) throw new Error('회원 보관 처리에 실패했습니다.')
   return true
 }
 
@@ -752,9 +734,9 @@ export async function clearAttendanceCode(sessionId) {
 }
 
 async function safeSelect(table) {
-  let { data, error } = await requireSupabase().from(table).select('*').order('id', { ascending: false })
+  let { data, error } = await requireSupabase().from(readableTable(table)).select(table === 'activity_sessions' ? '*' : safeFields(table)).order('id', { ascending: false })
   if (error && String(error.message).includes('id')) {
-    const fallback = await requireSupabase().from(table).select('*')
+    const fallback = await requireSupabase().from(readableTable(table)).select(table === 'activity_sessions' ? '*' : safeFields(table))
     data = fallback.data
     error = fallback.error
   }
@@ -764,11 +746,11 @@ async function safeSelect(table) {
 
 async function safeSelectSoft(table, orderColumn = 'id') {
   try {
-    let query = requireSupabase().from(table).select('*')
+    let query = requireSupabase().from(readableTable(table)).select(table === 'activity_sessions' ? '*' : safeFields(table))
     if (orderColumn) query = query.order(orderColumn, { ascending: false })
     const { data, error } = await query
     if (error && orderColumn) {
-      const fallback = await requireSupabase().from(table).select('*')
+      const fallback = await requireSupabase().from(readableTable(table)).select(table === 'activity_sessions' ? '*' : safeFields(table))
       if (fallback.error) return { data: [], error: `${table}: ${fallback.error.message}` }
       return { data: fallback.data ?? [], error: null }
     }
@@ -784,13 +766,13 @@ function emptyAdminOverview() {
 }
 
 async function insertRow(table, payload) {
-  const { data, error } = await requireSupabase().from(table).insert(payload).select('*').maybeSingle()
+  const { data, error } = await requireSupabase().from(table).insert(payload).select(safeFields(table)).maybeSingle()
   throwIfError(error)
   return data
 }
 
 async function updateRow(table, id, payload) {
-  const { data, error } = await requireSupabase().from(table).update(payload).eq('id', id).select('*').maybeSingle()
+  const { data, error } = await requireSupabase().from(table).update(payload).eq('id', id).select(safeFields(table)).maybeSingle()
   throwIfError(error)
   return data
 }
@@ -798,7 +780,7 @@ async function updateRow(table, id, payload) {
 // 삭제 결과를 검증합니다. RLS/권한 때문에 에러 없이 0건 삭제되는 경우를 잡아냅니다.
 function assertDeleted(rows) {
   if (!rows || rows.length === 0) {
-    throw new Error('DB에서 삭제되지 않았습니다(권한 차단). Supabase SQL Editor에서 prototype-write-access.sql 을 실행해 삭제 권한을 열어주세요.')
+    throw new Error('DB에서 삭제되지 않았습니다(권한 차단). 관리자 권한과 서버 접근 정책을 확인해 주세요.')
   }
 }
 

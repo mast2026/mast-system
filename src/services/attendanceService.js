@@ -1,6 +1,7 @@
-import { requireSupabase, throwIfError, TABLES } from './baseService'
+import { LEGACY_MEMBER_FIELDS } from './baseService'
+import { MEMBER_FIELDS, requireSupabase, throwIfError, TABLES } from './baseService'
 
-const SESSION_TABLE = 'activity_sessions'
+const SESSION_TABLE = 'mast_activity_sessions_client'
 const RECORD_TABLE = 'activity_attendance_records'
 const SUMMARY_VIEW = 'activity_attendance_summary_view'
 const LEGACY_MEMBERS_TABLE = 'members'
@@ -85,50 +86,10 @@ export async function getAttendanceDashboard(currentMember) {
 }
 
 export async function submitAttendance({ currentMember, sessionId, code }) {
-  if (!sessionId) throw new Error('출석할 모임을 선택해 주세요.')
-  const client = requireSupabase()
-  const legacyMember = await findAttendanceMember(currentMember)
-  if (!legacyMember) throw new Error('출석용 회원 정보를 찾지 못했습니다. members 테이블의 이름/학교/기수를 확인해 주세요.')
-
-  const { data: session, error: sessionError } = await client
-    .from(SESSION_TABLE)
-    .select('*')
-    .eq('id', sessionId)
-    .maybeSingle()
-  throwIfError(sessionError)
-  if (!session) throw new Error('모임 정보를 찾지 못했습니다.')
-
-  validateAttendanceSession(session, code)
-
-  const { data: existing, error: existingError } = await client
-    .from(RECORD_TABLE)
-    .select('id,status,checked_at')
-    .eq('session_id', session.id)
-    .eq('member_id', legacyMember.id)
-    .maybeSingle()
-  throwIfError(existingError)
-  if (existing) throw new Error('이미 출석이 완료된 모임입니다.')
-
-  // 정시 기준 시각(ontime_at) 이후 체크하면 지각. 없으면 모임 시작 일시 기준.
-  // 지각 30분 이내 -1점, 30분 초과 -3점 (감점은 points에 기록).
-  const tier = classifyAttendance(session, Date.now())
-  const payload = {
-    session_id: session.id,
-    member_id: legacyMember.id,
-    status: tier.status,
-    checked_at: new Date().toISOString(),
-    points: tier.status === 'present' ? Number(session.base_points ?? 1) : tier.points,
-  }
-
-  const { data, error } = await client
-    .from(RECORD_TABLE)
-    .insert(payload)
-    .select('*')
-    .single()
+  const { data, error } = await requireSupabase().rpc('mast_submit_attendance', { p_session_id: sessionId, p_code: String(code ?? '').trim() })
   throwIfError(error)
-
-  // 지각 감점은 출석 기록에서 활동날씨 계산 시 실시간으로 반영됩니다(별도 점수 이벤트 저장 안 함).
-  return { ...data, lateInfo: tier }
+  if (data?.error) throw new Error(data.error)
+  return data
 }
 
 // team_matching 회원 id 기준으로 해당 모임의 '지각' 점수 이벤트를 동기화합니다.
@@ -164,8 +125,8 @@ export async function writeAttendanceLateScore(tmMemberId, session, status, poin
 export async function resolveWeatherMemberId(legacyMemberId) {
   const client = requireSupabase()
   const [{ data: tmList }, { data: legacy }] = await Promise.all([
-    client.from(TABLES.members).select('*'),
-    client.from(LEGACY_MEMBERS_TABLE).select('*').eq('id', legacyMemberId).maybeSingle(),
+    client.from(TABLES.members).select(MEMBER_FIELDS),
+    client.from(LEGACY_MEMBERS_TABLE).select(LEGACY_MEMBER_FIELDS).eq('id', legacyMemberId).maybeSingle(),
   ])
   const list = tmList ?? []
   // 1) mast_member_id 직접 매칭

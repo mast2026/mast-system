@@ -1,3 +1,4 @@
+import { createClient } from 'npm:@supabase/supabase-js@2.50.0';
 // Supabase Edge Function: OneSignal 푸시 자동 발송
 // 앱에서 공지/출석/홍보 알림을 만들 때 호출하면 OneSignal로 실제 푸시를 보냅니다.
 //
@@ -24,6 +25,15 @@ function json(data: unknown, status = 200) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") || "";
+  const client = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } });
+  const { data: identity, error: identityError } = await client.auth.getUser(token);
+  if (identityError || !identity.user) return json({ error: "로그인이 필요합니다." }, 401);
+  const { data: memberId } = await client.rpc("mast_current_member_id");
+  if (!memberId) return json({ error: "사용할 수 없는 로그인입니다." }, 401);
+  const permissions = await Promise.all(["notice", "promotion", "attendance", "contest", "evaluation"].map(async section => (await client.rpc("mast_has_permission", { p_section: section })).data === true));
+  if (!permissions.some(Boolean)) return json({ error: "푸시 발송 권한이 없습니다." }, 403);
   if (!APP_ID || !REST_KEY) return json({ error: "ONESIGNAL_APP_ID / ONESIGNAL_REST_API_KEY 시크릿 미설정" }, 500);
 
   try {

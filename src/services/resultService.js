@@ -1,5 +1,5 @@
 import { RESULT_LABELS, resultLabel } from '../constants/results'
-import { requireSupabase, TABLES, throwIfError } from './baseService'
+import { MEMBER_FIELDS, requireSupabase, TABLES, throwIfError } from './baseService'
 
 let peerReviewCapabilityPromise
 
@@ -50,7 +50,7 @@ export async function getTeamResultContext(teamId, member) {
   ] = await Promise.all([
     client.from(TABLES.teams).select('*').eq('id', teamId).maybeSingle(),
     client.from(TABLES.contests).select('*'),
-    client.from(TABLES.members).select('*'),
+    client.from(TABLES.members).select(MEMBER_FIELDS),
     client.from(TABLES.teamMembers).select('*').eq('team_id', teamId),
     client.from(TABLES.awards).select('*').eq('team_id', teamId).order('id', { ascending: false }),
   ])
@@ -130,7 +130,7 @@ export async function getPeerReviewContext(teamId, member) {
   ] = await Promise.all([
     client.from(TABLES.teams).select('*').eq('id', teamId).maybeSingle(),
     client.from(TABLES.teamMembers).select('*').eq('team_id', teamId),
-    client.from(TABLES.members).select('*'),
+    client.from(TABLES.members).select(MEMBER_FIELDS),
     client.from(TABLES.peerReviews).select('*').eq('team_id', teamId).eq('reviewer_id', member.id),
   ])
   throwIfError(teamError || linkError || memberError || existingError)

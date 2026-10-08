@@ -1,4 +1,4 @@
-import { TABLES, requireSupabase, throwIfError } from './baseService'
+import { MEMBER_FIELDS, TABLES, requireSupabase, throwIfError } from './baseService'
 import { notifyAdmins, sendOneSignalPush } from './notificationService'
 
 const CONTEST_MARKER = '[contest_id]'
@@ -143,7 +143,7 @@ export async function getPendingLeaderApplications() {
   const client = requireSupabase()
   const [{ data: applications, error }, { data: members, error: memberError }, { data: contests, error: contestError }] = await Promise.all([
     client.from(TABLES.leaderApplications).select('*').eq('status', 'pending').order('id', { ascending: true }),
-    client.from(TABLES.members).select('*'),
+    client.from(TABLES.members).select(MEMBER_FIELDS),
     client.from(TABLES.contests).select('*'),
   ])
   throwIfError(error || memberError || contestError)

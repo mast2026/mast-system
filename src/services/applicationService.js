@@ -1,4 +1,4 @@
-import { TABLES, requireSupabase, throwIfError } from './baseService'
+import { MEMBER_FIELDS, TABLES, requireSupabase, throwIfError } from './baseService'
 import { notifyAdmins, sendOneSignalPush } from './notificationService'
 import { isContestOpen } from './contestService'
 import { detectTeamCapabilities, TEAM_PUBLIC_FIELDS } from './teamService'
@@ -76,7 +76,7 @@ export async function submitApplication(teamId, applicantId, values) {
 }
 export async function getLeaderApplicationsForTeam(teamId, leaderId) {
   const client = requireSupabase(); const { data: team, error: teamError } = await client.from(TABLES.teams).select('*').eq('id', teamId).eq('leader_id', leaderId).maybeSingle(); throwIfError(teamError); if (!team) throw new Error('이 팀의 지원자를 관리할 권한이 없습니다.')
-  const [{ data: applications, error }, { data: members, error: memberError }] = await Promise.all([client.from(TABLES.applications).select('*').eq('team_id', teamId).order('id', { ascending: false }), client.from(TABLES.members).select('*')]); throwIfError(error || memberError)
+  const [{ data: applications, error }, { data: members, error: memberError }] = await Promise.all([client.from(TABLES.applications).select('*').eq('team_id', teamId).order('id', { ascending: false }), client.from(TABLES.members).select(MEMBER_FIELDS)]); throwIfError(error || memberError)
   const byId = new Map((members ?? []).map((x) => [x.id, x])); return (applications ?? []).map((x) => ({ ...x, applicant: byId.get(x.applicant_id) }))
 }
 export async function decideApplication(applicationId, leaderId, decision, rejectReason = '') {

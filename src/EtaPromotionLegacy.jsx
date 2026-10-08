@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { LEGACY_MEMBER_FIELDS } from "./services/baseService.js";
+import SecureProofImage from "./components/SecureProofImage.jsx";
 import { supabase } from "./lib/supabase.js";
 import { notifyPromotionTargets } from "./services/notificationService.js";
 import mastLogo from "./assets/mast-logo.webp";
@@ -6,7 +8,7 @@ import promotionHeroImg from "./assets/promotion-hero.webp";
 import cameraImg from "./assets/camera.webp";
 
 var PROOF_BUCKET = "proofs";
-var ADMIN_CODE = import.meta.env.VITE_ADMIN_CODE || "mast2026!";
+
 var MISSION_BUCKET = "missions";
 var assets = {
   hero: { megaphone: promotionHeroImg },
@@ -291,33 +293,8 @@ function LoginPage(props) {
   var isDesktop = winW >= 768;
 
   async function submit() {
-    setErr(""); setLoading(true);
-    try {
-      var hasCode = code.trim().length > 0;
-      var hasFields = name.trim() && gi.trim() && school.trim();
-
-      if (hasCode && !hasFields) {
-        if (code.trim() === ADMIN_CODE) {
-          props.onLogin({ member: { name: "관리자", gi: "-", school: "-" }, role: "admin" });
-          return;
-        }
-        setErr("관리자 코드가 올바르지 않습니다."); return;
-      }
-      if (!hasFields) { setErr("이름·기수·학교를 입력하거나, 관리자 코드만 입력해 주세요."); return; }
-
-      var res = await supabase.from("members").select("id, name, gi, school, major, email, role, status").eq("name", name.trim()).eq("status", "active");
-      if (res.error) throw res.error;
-      var m = (res.data || []).find(function(row) {
-        return normalize(row.gi) === normalize(gi) && schoolMatch(school, row.school);
-      });
-      if (!m) { setErr("명단에서 찾을 수 없습니다. 이름·기수·학교를 다시 확인해 주세요."); return; }
-
-      var role = hasCode && code.trim() === ADMIN_CODE ? "admin" : "member";
-      if (hasCode && role !== "admin") { setErr("관리자 코드가 올바르지 않습니다."); return; }
-
-      props.onLogin({ member: m, role: role });
-    } catch(e) { setErr("오류가 발생했습니다. 잠시 후 다시 시도해 주세요."); console.error(e); }
-    finally { setLoading(false); }
+    setErr("보안 로그인이 필요합니다. 회원 또는 관리자 로그인 화면으로 이동해 주세요.");
+    window.location.assign(code.trim() ? "/admin-login" : "/login");
   }
 
   // 공통 콘텐츠 (카드 안/풀스크린 안에 똑같이 들어감)
@@ -957,7 +934,7 @@ function UploadForm(props) {
         var ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
         if (!ext) ext = "jpg";
         var safeKey = encodeURIComponent(keyOf(member)).replace(/[^a-zA-Z0-9]/g, "_").slice(0, 20);
-        var path = mission.mission_date + "/" + safeKey + "_" + Date.now() + "." + ext;
+        var path = member.id + "/" + mission.mission_date + "/" + safeKey + "_" + Date.now() + "." + ext;
         var upRes = await supabase.storage.from(PROOF_BUCKET).upload(path, file, { upsert: true });
         if (upRes.error) throw upRes.error;
         row.proof_image_url = supabase.storage.from(PROOF_BUCKET).getPublicUrl(path).data.publicUrl;
@@ -992,7 +969,7 @@ function UploadForm(props) {
       <div style={{ fontSize: 12.5, fontWeight: 800, color: "#0860EC", background: "#EAF2FF", borderRadius: 12, padding: "10px 12px", marginBottom: 12, lineHeight: "18px", wordBreak: "keep-all", textAlign: "center" }}>우리 동아리 게시글이 게시판 최신 상단 5개 안에 있으면 도배 방지를 위해 추가 업로드 없이 건너뛰기 해주세요. 캡처는 최신 글 목록이 보이도록 올려주세요.</div>
       {(preview || existingImg) ? (
         <div style={{ position: "relative", marginBottom: 12 }}>
-          <img src={preview || existingImg} alt="미리보기" style={{ width: "100%", maxHeight: 300, objectFit: "contain", borderRadius: 14, border: "1px solid #E5EAF2" }} />
+          <SecureProofImage src={preview || existingImg} path={preview ? null : existingProof?.proof_file_path} alt="미리보기" style={{ width: "100%", maxHeight: 300, objectFit: "contain", borderRadius: 14, border: "1px solid #E5EAF2" }} />
           <button onClick={function() { fileRef.current && fileRef.current.click(); }}
             style={{ position: "absolute", top: 8, right: 8, border: "none", borderRadius: 8, background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 12, padding: "5px 12px", cursor: "pointer", fontFamily: FONT, fontWeight: 600 }}>변경</button>
         </div>
@@ -1268,7 +1245,7 @@ function AdminDashboard(props) {
     } else {
       setAssignments([]);
     }
-    var r3 = await supabase.from("members").select("*");
+    var r3 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS);
     setMembers(r3.data || []);
     setLoading(false);
   }, [today]);
@@ -1603,7 +1580,7 @@ function AdminMission(props) {
     } else {
       setMission(null); setTitle(""); setBody(""); setPostTitle(""); setPostBody(""); setDeadlineDate(addDaysKST(today, 1)); setDeadline("02:00"); setSelected(new Set()); setImgPreview(null); setAutoPickApplied(false);
     }
-    var r2 = await supabase.from("members").select("*");
+    var r2 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS);
     var memberRows = sortMembersForRotation(r2.data || []);
     setMembers(memberRows);
     var r3 = await supabase.from("promotion_missions").select("*").lt("mission_date", today).order("mission_date", { ascending: false }).limit(10);
@@ -2397,7 +2374,7 @@ function AdminMembers() {
 
   var load = useCallback(async function() {
     setLoading(true);
-    var r1 = await supabase.from("members").select("*").order("name");
+    var r1 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS).order("name");
     setMembers(r1.data || []);
     var r2 = await supabase.from("promotion_member_progress_view").select("*");
     var stats = {};
@@ -2950,7 +2927,7 @@ function AdminCerts() {
 
       {zoom && (
         <Modal onClose={function() { setZoom(null); }} maxWidth={560}>
-          <img src={zoom.proof.proof_image_url} alt="인증 캡처" style={{ width: "100%", borderRadius: 12, maxHeight: 500, objectFit: "contain" }} />
+          <SecureProofImage src={zoom.proof.proof_image_url} path={zoom.proof.proof_file_path} alt="인증 캡처" style={{ width: "100%", borderRadius: 12, maxHeight: 500, objectFit: "contain" }} />
           <div style={{ marginTop: 12, fontSize: 13, color: SUB }}>제출: {fmtTime(zoom.submitted_at)} · {zoom.member_name}</div>
         </Modal>
       )}
@@ -3011,7 +2988,7 @@ function AdminUncert() {
       setNoticeEdited(false);
       var r1 = await supabase.from("promotion_missions").select("*").eq("mission_date", selDate).maybeSingle();
       setMission(r1.data || null);
-      var r2 = await supabase.from("members").select("*");
+      var r2 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS);
       setMembers(r2.data || []);
       if (r1.data) {
         var r3 = await supabase.from("promotion_assignment_status_view").select("*").eq("mission_id", r1.data.id);
