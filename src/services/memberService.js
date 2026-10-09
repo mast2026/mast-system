@@ -34,3 +34,7 @@ export async function loginFirstTime(name, school, generation, password, confirm
 export async function loginAdminWithCode(code) {
   return establishSession('admin-login', { code: String(code ?? '').trim() })
 }
+
+export async function verifyFirstLoginIdentity(identity) {
+  return serverAuth('verify-first-login', identity)
+}

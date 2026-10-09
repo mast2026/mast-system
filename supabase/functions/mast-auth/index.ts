@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.50.0'
+import { matchesFirstLoginIdentity } from './firstLoginIdentity.js'
 const URL = Deno.env.get('SUPABASE_URL')!
 const SECRET = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const ANON = Deno.env.get('SUPABASE_ANON_KEY')!
@@ -15,7 +16,7 @@ Deno.serve(async req=>{
   const b=JSON.parse(text), action=String(b.action||'')
   const db=createClient(URL,SECRET,{auth:{persistSession:false,autoRefreshToken:false}})
   const peer=req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||'unknown'
-  const allowed=['lookup','login','admin-login','me','complete-reset','issue-reset','request-reset','first-login']
+  const allowed=['lookup','login','admin-login','me','complete-reset','issue-reset','request-reset','first-login','verify-first-login']
   if(!allowed.includes(action))return reply({error:'지원하지 않는 요청입니다.'},400)
   const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(peer)))
   const ipkey=Array.from(digest).map(v=>v.toString(16).padStart(2,'0')).join('')
@@ -41,6 +42,16 @@ Deno.serve(async req=>{
    const {data:rows,error}=await db.from('team_matching_members').select('id,name,school,generation,password_hash').eq('roster_status','active').ilike('name',name.replace(/[%_\\]/g,'\\$&')).limit(5)
    if(error)throw error
    return reply({members:(rows||[]).map(m=>({id:m.id,name:m.name,school:m.school,generation:m.generation,has_password:!!m.password_hash}))})
+  }
+  if(action==='verify-first-login'){
+   const key=String(b.name||'').trim().toLowerCase()
+   const {data:accountRate,error:accountError}=await db.rpc('mast_check_auth_rate',{p_key:`first-identity:${key}`,p_limit:10,p_seconds:600})
+   if(accountError)throw accountError
+   if(!accountRate)return reply({error:'시도 횟수가 너무 많습니다. 잠시 후 다시 시도해 주세요.'},429)
+   const {data:member,error}=await db.from('team_matching_members').select('id,name,school,generation,phone,password_hash,roster_status').eq('id',Number(b.memberId)||0).eq('roster_status','active').maybeSingle()
+   if(error)throw error
+   if(!matchesFirstLoginIdentity(member,b))return reply({error:'입력한 회원 정보를 확인해 주세요. 비밀번호가 이미 있다면 일반 로그인 또는 비밀번호 재설정을 이용해 주세요.'},400)
+   return reply({ok:true})
   }
   if(action==='request-reset'){
    const {data,error}=await db.rpc('request_member_password_reset',{p_name:String(b.name||'').trim(),p_school:String(b.school||'').trim(),p_generation:String(b.generation||'').trim(),p_phone:String(b.phone||'').trim()})
