@@ -3,51 +3,7 @@ import { Link } from 'react-router-dom'
 import { MemberApp } from '../EtaPromotionLegacy.jsx'
 import LoadingCloud from '../components/common/LoadingCloud'
 import { useAuth } from '../context/AuthContext'
-import { supabase } from '../lib/supabase'
-
-const normalizeText = (value) => String(value ?? '').trim().toLowerCase().replace(/\s+/g, '')
-const normalizeGeneration = (value) => String(value ?? '').replace(/[^0-9]/g, '')
-
-function isSameSchool(input, saved) {
-  const a = normalizeText(input)
-  const b = normalizeText(saved)
-  if (!a || !b) return true
-  return a.includes(b) || b.includes(a)
-}
-
-function isSameGeneration(input, saved) {
-  const a = normalizeGeneration(input)
-  const b = normalizeGeneration(saved)
-  if (!a || !b) return true
-  return a === b
-}
-
-async function findPromotionMember(currentMember) {
-  if (!supabase || !currentMember?.name) return null
-
-  if (currentMember.mast_member_id) {
-    const { data } = await supabase
-      .from('members')
-      .select('id,name,gi,school,major,email,role,status')
-      .eq('id', currentMember.mast_member_id)
-      .maybeSingle()
-    if (data) return data
-  }
-
-  const { data, error } = await supabase
-    .from('members')
-    .select('id,name,gi,school,major,email,role,status')
-    .eq('name', currentMember.name)
-    .order('id', { ascending: true })
-
-  if (error) throw error
-
-  const activeRows = (data ?? []).filter((row) => (row.status ?? 'active') === 'active')
-  return activeRows.find((row) => (
-    isSameSchool(currentMember.school, row.school)
-    && isSameGeneration(currentMember.generation, row.gi)
-  )) ?? activeRows[0] ?? null
-}
+import { findPromotionMember } from '../services/promotionService'
 
 export default function PromotionLegacyScreen() {
   const { member } = useAuth()
@@ -87,11 +43,7 @@ export default function PromotionLegacyScreen() {
       <main className="promotion-link-state">
         <div className="promotion-link-card">
           <h1>홍보 시스템 회원 연결 필요</h1>
-          <p>
-            통합 로그인 회원 정보와 기존 홍보 시스템의 회원 명단을 매칭하지 못했어요.
-            이름, 학교, 기수가 기존 홍보 DB의 members 테이블과 같은지 확인해 주세요.
-          </p>
-          {error && <p className="promotion-link-error">{error}</p>}
+          <p>{error ? '홍보 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.' : '홍보 회원 정보를 찾지 못했어요. 운영진에게 문의해 주세요.'}</p>
           <Link to="/" className="primary-button">홈으로 돌아가기</Link>
         </div>
       </main>

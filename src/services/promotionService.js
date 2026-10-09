@@ -1,4 +1,4 @@
-import { requireSupabase, throwIfError } from './baseService'
+import { requireSupabase, throwIfError, LEGACY_MEMBER_FIELDS } from './baseService'
 
 const PROOF_BUCKET = 'proofs'
 const SUBMITTED_STATUSES = ['submitted', 'approved', 'late']
@@ -121,29 +121,23 @@ export async function submitPromotionProof({ assignment, mission, member, file, 
   throwIfError(assignmentResult.error)
 }
 
-async function findPromotionMember(currentMember) {
-  if (!currentMember?.name) return null
+export async function findPromotionMember(currentMember) {
+  if (!currentMember?.id) return null
   const client = requireSupabase()
-  // 이름 표기(공백 등)가 살짝 달라도 매칭되도록 전체를 받아 정규화 비교합니다.
-  const { data, error } = await client
-    .from('members')
-    .select('id,name,gi,school,major,email,role,status')
+  let legacyId = currentMember.mast_member_id
+  if (!legacyId) {
+    const { data, error } = await client.rpc('mast_current_legacy_id')
+    throwIfError(error)
+    legacyId = data
+  }
+  if (!legacyId) return null
+  const { data, error } = await client.from('members')
+    .select(LEGACY_MEMBER_FIELDS)
+    .eq('id', legacyId)
+    .eq('status', 'active')
+    .maybeSingle()
   throwIfError(error)
-
-  const targetName = normalize(currentMember.name)
-  const generation = extractNumber(currentMember.generation)
-  const school = normalize(currentMember.school)
-  const candidates = (data || []).filter((member) => normalize(member.name) === targetName)
-  if (!candidates.length) return null
-  return candidates.find((member) => {
-    const sameGeneration = generation && extractNumber(member.gi) === generation
-    const sameSchool = school && schoolLooseMatch(school, normalize(member.school))
-    return sameGeneration && sameSchool
-  })
-    || candidates.find((member) => generation && extractNumber(member.gi) === generation)
-    || candidates.find((member) => (member.status || 'active') === 'active')
-    || candidates[0]
-    || null
+  return data ?? null
 }
 
 async function fetchVisibleMemberMission(client, today) {
@@ -165,16 +159,4 @@ async function fetchVisibleMemberMission(client, today) {
     .maybeSingle()
   throwIfError(fallback.error)
   return fallback.data || null
-}
-
-function normalize(value) {
-  return String(value ?? '').replace(/\s/g, '').toLowerCase()
-}
-
-function extractNumber(value) {
-  return String(value ?? '').match(/\d+/)?.[0] || ''
-}
-
-function schoolLooseMatch(a, b) {
-  return a === b || a.startsWith(b) || b.startsWith(a)
 }
