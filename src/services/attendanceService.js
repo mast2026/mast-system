@@ -1,4 +1,5 @@
 import { LEGACY_MEMBER_FIELDS } from './baseService'
+import { findPromotionMember } from './promotionService'
 import { MEMBER_FIELDS, requireSupabase, throwIfError, TABLES } from './baseService'
 
 const SESSION_TABLE = 'mast_activity_sessions_client'
@@ -46,7 +47,7 @@ export async function getActiveAttendanceSessions() {
     .from(SESSION_TABLE)
     .select('*')
     .order('starts_at', { ascending: false })
-  if (error) return []
+  throwIfError(error)
   const now = Date.now()
   return (data ?? []).filter((session) => isAttendableNow(session, now))
 }
@@ -63,8 +64,13 @@ export async function getAttendanceDashboard(currentMember) {
     legacyMember
       ? client.from(SUMMARY_VIEW).select('*').eq('member_id', legacyMember.id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    client.from(LEGACY_MEMBERS_TABLE).select('id,name,school,major,gi,status').limit(500),
+    client.from(LEGACY_MEMBERS_TABLE).select('id,name,school,major,gi,status').eq('status', 'active').limit(500),
   ])
+
+  throwIfError(sessionsRes.error)
+  throwIfError(recordsRes.error)
+  throwIfError(membersRes.error)
+  if (summaryRes.error && summaryRes.error.code !== 'PGRST116') throwIfError(summaryRes.error)
 
   const warnings = []
   if (sessionsRes.error) warnings.push(`모임 일정: ${sessionsRes.error.message}`)
@@ -168,39 +174,7 @@ export function classifyAttendance(session, now = Date.now()) {
 }
 
 export async function findAttendanceMember(currentMember) {
-  if (!currentMember) return null
-  const client = requireSupabase()
-
-  if (currentMember.mast_member_id) {
-    const { data, error } = await client
-      .from(LEGACY_MEMBERS_TABLE)
-      .select('*')
-      .eq('id', currentMember.mast_member_id)
-      .maybeSingle()
-    if (!error && data) return data
-  }
-
-  const { data, error } = await client
-    .from(LEGACY_MEMBERS_TABLE)
-    .select('*')
-    .order('name', { ascending: true })
-  throwIfError(error)
-
-  const name = normalize(currentMember.name)
-  const school = normalize(currentMember.school)
-  const generation = generationNumber(currentMember.generation)
-
-  const list = data ?? []
-  const strict = list.find((member) => {
-    const nameMatched = normalize(member.name) === name
-    const schoolMatched = !school || normalize(member.school) === school
-    const giMatched = !generation || generationNumber(member.gi) === generation || generationNumber(member.generation) === generation
-    return nameMatched && schoolMatched && giMatched
-  })
-  if (strict) return strict
-  // 학교/기수가 조금 달라도 이름이 유일하게 일치하면 연결 (연결 실패 방지)
-  const byName = list.filter((member) => normalize(member.name) === name)
-  return byName.length === 1 ? byName[0] : null
+  return findPromotionMember(currentMember)
 }
 
 function validateAttendanceSession(session, code) {

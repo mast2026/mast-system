@@ -9,7 +9,7 @@ import SchoolAutocomplete from '../components/SchoolAutocomplete'
 
 const memberLoginMode = { label: '회원', roles: null, next: '/' }
 
-function PasswordField({ id, value, onChange, placeholder, autoComplete, required, minLength }) {
+function PasswordField({ id, value, onChange, placeholder, autoComplete, required }) {
   const [show, setShow] = useState(false)
   return (
     <div className="auth-input">
@@ -23,7 +23,6 @@ function PasswordField({ id, value, onChange, placeholder, autoComplete, require
         placeholder={placeholder}
         autoComplete={autoComplete}
         required={required}
-        minLength={minLength}
       />
       <button type="button" className="auth-eye" onClick={() => setShow((s) => !s)} aria-label={show ? '비밀번호 숨기기' : '비밀번호 보기'}>
         {show ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -155,14 +154,14 @@ export default function LoginScreen() {
 
         {isFirstLogin && <div className="auth-input"><UserRound className="login-input-icon" /><input aria-label="전화번호" value={phone} onChange={e => { setPhone(e.target.value); setIdentityVerified(false) }} type="tel" inputMode="tel" placeholder="전화번호 전체를 입력하세요" autoComplete="tel" disabled={identityVerified} required /></div>}
 
-        {(!isFirstLogin || identityVerified) && !needsPick && <PasswordField value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호를 입력하세요" autoComplete={isFirstLogin ? 'new-password' : 'current-password'} minLength={isFirstLogin ? 8 : 4} required />}
+        {(!isFirstLogin || identityVerified) && !needsPick && <PasswordField value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호를 입력하세요" autoComplete={isFirstLogin ? 'new-password' : 'current-password'} required />}
 
-        {isFirstLogin && identityVerified && <PasswordField value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="비밀번호를 한 번 더 입력" autoComplete="new-password" minLength={isFirstLogin ? 8 : 4} required />}
+        {isFirstLogin && identityVerified && <PasswordField value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="비밀번호를 한 번 더 입력" autoComplete="new-password" required />}
 
         {name.trim() && !sameNameCount && !loading && <div className="auth-note warning">회원 목록에서 같은 이름을 찾지 못했어요. 이름을 정확히 입력해 주세요.</div>}
         {needsPick && <div className="auth-note">같은 이름의 회원이 여러 명이에요. 위에서 본인 학교·기수를 선택해 주세요.</div>}
         {isCheckingPw && <div className="auth-note"><LoadingCloud size="small" text="계정 확인 중..." /></div>}
-        {isFirstLogin && identityVerified && <div className="auth-note success">비밀번호는 영문과 숫자를 포함해 8자 이상 설정해 주세요.</div>}
+        {isFirstLogin && identityVerified && <div className="auth-note success">사용할 비밀번호를 입력하고 한 번 더 확인해 주세요.</div>}
         {info && <div className="auth-note">{info}</div>}
         {message && <div className="auth-note error">{message}</div>}
         {error && <div className="auth-note error">{error.message}</div>}

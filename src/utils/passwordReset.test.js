@@ -2,12 +2,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildPasswordResetLink, resetTokenFromHash, validateResetPassword } from './passwordReset.js'
 
-test('requires a matching password containing letters and numbers within the size limit', () => {
-  assert.equal(validateResetPassword('newPass123', 'newPass123'), '')
-  for (const password of ['short1', '12345678', 'abcdefgh', 'a1'.repeat(65)]) {
-    assert.ok(validateResetPassword(password, password))
+test('allows any nonempty matching password without length or character composition rules', () => {
+  for (const password of ['1', '1234', 'abc', '한글', '!', ' ', 'a'.repeat(300)]) {
+    assert.equal(validateResetPassword(password, password), '')
   }
-  assert.ok(validateResetPassword('newPass123', 'different123'))
+  assert.ok(validateResetPassword('', ''))
+  assert.ok(validateResetPassword('1234', 'different'))
 })
 
 test('keeps reset credentials in the fragment, away from server request URLs', () => {

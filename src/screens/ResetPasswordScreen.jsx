@@ -65,9 +65,8 @@ export default function ResetPasswordScreen() {
       </> : token ? <>
         <p>새 비밀번호를 입력해 주세요.{linkToken ? ' 이 링크는 발급 후 30분 동안 한 번만 사용할 수 있어요.' : ''}</p>
         <form className="auth-form" onSubmit={submit}>
-          <label>새 비밀번호<input type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} maxLength={128} required disabled={busy} /></label>
-          <small>영문과 숫자를 포함해 8자 이상 입력해 주세요.</small>
-          <label>새 비밀번호 확인<input type="password" autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} minLength={8} maxLength={128} required disabled={busy} /></label>
+          <label>새 비밀번호<input type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} required disabled={busy} /></label>
+          <label>새 비밀번호 확인<input type="password" autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} required disabled={busy} /></label>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="auth-button auth-button-primary" disabled={busy}>{busy ? '변경 중...' : '새 비밀번호 저장'}</button>
         </form>

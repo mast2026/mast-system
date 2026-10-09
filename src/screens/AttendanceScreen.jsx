@@ -37,7 +37,7 @@ export default function AttendanceScreen() {
   }, [])
 
   if (query.loading) return <LoadingState label="출석 시스템을 불러오는 중..." />
-  if (query.error) return <ErrorState error={query.error} retry={query.retry} />
+  if (query.error || query.warning) return <ErrorState error={query.error || query.warning} retry={query.retry} />
 
   const data = query.data
   const sortedSessions = [...data.sessions].sort(byStartsAtDesc)
@@ -94,7 +94,7 @@ export default function AttendanceScreen() {
           <section className="attendance-panel">
             <div className="mast-section-heading">
               <h2>최근 모임</h2>
-              <span>출석 내역 확인</span>
+              <button type="button" onClick={() => setTab('sessions')}>전체 보기 <ChevronRight /></button>
             </div>
             <SessionList sessions={recentSessions} records={data.records} emptyTitle="최근 모임이 없습니다" />
           </section>
@@ -216,7 +216,7 @@ function SessionList({ sessions, records = [], emptyTitle }) {
           <div>
             <b>{session.title}</b>
             <p>{session.description || session.location || '모임 설명이 없습니다.'}</p>
-            <small>{formatSessionDate(session)}</small>
+            <small>{formatSessionDate(session)} · {session.session_mode === 'online' ? '온라인' : '오프라인'}{session.location && session.location !== '온라인' ? ` · ${session.location}` : ''}</small>
           </div>
           <span className={`badge badge-${myRecord?.status || effectiveSessionStatus(session)}`}>{attendanceStatusLabel(myRecord?.status || effectiveSessionStatus(session))}</span>
         </article>
@@ -234,7 +234,7 @@ function formatAttendanceNotice(warning) {
   if (!warning) return null
   const text = String(warning)
   if (text.includes('permission denied')) {
-    return '출석 일정 권한 확인이 필요해요. DB 정책이 열리면 모임 목록과 출석 체크가 표시됩니다.'
+    return '일부 출석 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
   }
   if (text.includes('회원') || text.includes('member')) {
     return '회원 연결 확인이 필요해요. 이름, 학교, 기수 정보가 맞는지 확인해 주세요.'
@@ -256,8 +256,8 @@ function formatSessionDate(session) {
   const start = session.starts_at ? new Date(session.starts_at) : null
   const end = session.ends_at ? new Date(session.ends_at) : null
   if (!start || Number.isNaN(start.getTime())) return '일정 미정'
-  const date = start.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' })
-  const startTime = start.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
-  const endTime = end && !Number.isNaN(end.getTime()) ? end.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''
+  const date = start.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: 'Asia/Seoul' })
+  const startTime = start.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' })
+  const endTime = end && !Number.isNaN(end.getTime()) ? end.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' }) : ''
   return `${date} ${startTime}${endTime ? ` ~ ${endTime}` : ''}`
 }
