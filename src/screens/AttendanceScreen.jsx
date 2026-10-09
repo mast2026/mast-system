@@ -218,7 +218,7 @@ function SessionList({ sessions, records = [], emptyTitle }) {
             <p>{session.description || session.location || '모임 설명이 없습니다.'}</p>
             <small>{formatSessionDate(session)} · {session.session_mode === 'online' ? '온라인' : '오프라인'}{session.location && session.location !== '온라인' ? ` · ${session.location}` : ''}</small>
           </div>
-          <span className={`badge badge-${myRecord?.status || effectiveSessionStatus(session)}`}>{attendanceStatusLabel(myRecord?.status || effectiveSessionStatus(session))}</span>
+          {!isPastSession(session) && <span className={`badge badge-${myRecord?.status || effectiveSessionStatus(session)}`}>{attendanceStatusLabel(myRecord?.status || effectiveSessionStatus(session))}</span>}
         </article>
         )
       })}

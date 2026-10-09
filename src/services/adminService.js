@@ -7,7 +7,7 @@ import { deleteTeamPost, TEAM_PUBLIC_FIELDS } from './teamService'
 
 export async function getAdminDashboardData() {
   const [members, contests, teams, applications, leaderApplications, weatherRows, attendance, promotion] = await Promise.all([
-    safeSelect(TABLES.members),
+    getMembers(),
     safeSelect(TABLES.contests),
     safeSelect(TABLES.teams),
     safeSelect(TABLES.applications),
@@ -747,10 +747,13 @@ async function safeSelect(table) {
 async function safeSelectSoft(table, orderColumn = 'id') {
   try {
     let query = requireSupabase().from(readableTable(table)).select(table === 'activity_sessions' ? '*' : safeFields(table))
+    if (table === 'members') query = query.eq('status', 'active')
     if (orderColumn) query = query.order(orderColumn, { ascending: false })
     const { data, error } = await query
     if (error && orderColumn) {
-      const fallback = await requireSupabase().from(readableTable(table)).select(table === 'activity_sessions' ? '*' : safeFields(table))
+      let fallbackQuery = requireSupabase().from(readableTable(table)).select(table === 'activity_sessions' ? '*' : safeFields(table))
+      if (table === 'members') fallbackQuery = fallbackQuery.eq('status', 'active')
+      const fallback = await fallbackQuery
       if (fallback.error) return { data: [], error: `${table}: ${fallback.error.message}` }
       return { data: fallback.data ?? [], error: null }
     }

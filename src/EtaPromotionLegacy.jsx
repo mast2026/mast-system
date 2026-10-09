@@ -1245,7 +1245,7 @@ function AdminDashboard(props) {
     } else {
       setAssignments([]);
     }
-    var r3 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS);
+    var r3 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS).eq("status", "active");
     setMembers(r3.data || []);
     setLoading(false);
   }, [today]);
@@ -1580,7 +1580,7 @@ function AdminMission(props) {
     } else {
       setMission(null); setTitle(""); setBody(""); setPostTitle(""); setPostBody(""); setDeadlineDate(addDaysKST(today, 1)); setDeadline("02:00"); setSelected(new Set()); setImgPreview(null); setAutoPickApplied(false);
     }
-    var r2 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS);
+    var r2 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS).eq("status", "active");
     var memberRows = sortMembersForRotation(r2.data || []);
     setMembers(memberRows);
     var r3 = await supabase.from("promotion_missions").select("*").lt("mission_date", today).order("mission_date", { ascending: false }).limit(10);
@@ -2374,7 +2374,7 @@ function AdminMembers() {
 
   var load = useCallback(async function() {
     setLoading(true);
-    var r1 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS).order("name");
+    var r1 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS).eq("status", "active").order("name");
     setMembers(r1.data || []);
     var r2 = await supabase.from("promotion_member_progress_view").select("*");
     var stats = {};
@@ -2988,7 +2988,7 @@ function AdminUncert() {
       setNoticeEdited(false);
       var r1 = await supabase.from("promotion_missions").select("*").eq("mission_date", selDate).maybeSingle();
       setMission(r1.data || null);
-      var r2 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS);
+      var r2 = await supabase.from("members").select(LEGACY_MEMBER_FIELDS).eq("status", "active");
       setMembers(r2.data || []);
       if (r1.data) {
         var r3 = await supabase.from("promotion_assignment_status_view").select("*").eq("mission_id", r1.data.id);
