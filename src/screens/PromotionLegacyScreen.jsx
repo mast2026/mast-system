@@ -27,7 +27,7 @@ export default function PromotionLegacyScreen() {
       .finally(() => alive && setLoading(false))
 
     return () => { alive = false }
-  }, [member])
+  }, [member?.id, member?.mast_member_id])
 
   const session = useMemo(() => {
     if (!promotionMember) return null

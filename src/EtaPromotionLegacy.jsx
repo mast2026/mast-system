@@ -916,7 +916,9 @@ function UploadForm(props) {
   }
 
   async function submit() {
+    if (busy) return;
     if (!file && !existingProof) { setErr("사진을 선택해 주세요."); return; }
+    if (file && file.size > 10 * 1024 * 1024) { setErr("사진은 10MB 이하로 선택해 주세요."); return; }
     setBusy(true); setErr("");
     try {
       var nowIso = new Date().toISOString();
@@ -928,9 +930,6 @@ function UploadForm(props) {
       var row = { assignment_id: assignment.id, mission_id: mission.id, member_id: member.id, submitted_at: nowIso };
 
       if (file) {
-        if (existingProof && existingProof.proof_file_path) {
-          await supabase.storage.from(PROOF_BUCKET).remove([existingProof.proof_file_path]);
-        }
         var ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
         if (!ext) ext = "jpg";
         var safeKey = encodeURIComponent(keyOf(member)).replace(/[^a-zA-Z0-9]/g, "_").slice(0, 20);
@@ -941,17 +940,22 @@ function UploadForm(props) {
         row.proof_file_path = path;
       }
 
-      var dbRes;
-      if (existingProof) {
-        dbRes = await supabase.from("promotion_proofs").update(row).eq("id", existingProof.id);
-      } else {
-        dbRes = await supabase.from("promotion_proofs").upsert(row, { onConflict: "assignment_id" });
+      var saved = await supabase.rpc("mast_submit_promotion_proof", {
+        p_assignment_id: assignment.id,
+        p_file_path: row.proof_file_path || existingProof?.proof_file_path,
+        p_skipped: skipped,
+      });
+      if (saved.error) throw saved.error;
+      if (!saved.data?.ok) throw new Error("인증 저장을 확인하지 못했습니다.");
+      if (file && existingProof?.proof_file_path) {
+        await supabase.storage.from(PROOF_BUCKET).remove([existingProof.proof_file_path]);
       }
-      if (dbRes.error) throw dbRes.error;
-      var aRes = await supabase.from("promotion_mission_assignments").update({ status: ST.SUBMITTED, submitted_at: nowIso, status_reason: skipped ? "건너뛰기(기존 게시물 존재)" : null }).eq("id", assignment.id);
-      if (aRes.error) throw aRes.error;
       props.onDone();
-    } catch(e) { setErr("업로드 중 오류가 발생했습니다. 다시 시도해 주세요."); console.error(e); }
+    } catch(e) {
+      const detail = String(e?.message || e?.error || "");
+      setErr(/size|large|exceed/i.test(detail) ? "사진 용량이 너무 큽니다. 10MB 이하로 선택해 주세요." : /mime|type/i.test(detail) ? "지원하지 않는 사진 형식입니다. JPG 또는 PNG로 선택해 주세요." : /jwt|token|session|unauthorized/i.test(detail) ? "로그인 연결을 확인하지 못했어요. 사진은 유지되니 잠시 후 다시 제출해 주세요." : "인증을 저장하지 못했어요. 선택한 사진은 유지됩니다. 다시 제출해 주세요.");
+      console.error("promotion proof submission failed", e);
+    }
     finally { setBusy(false); }
   }
 
