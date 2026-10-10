@@ -1,3 +1,4 @@
+import { promotionIntervalDays, promotionCopyForSchool } from "./utils/promotionSchoolRules.js";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { LEGACY_MEMBER_FIELDS } from "./services/baseService.js";
 import SecureProofImage from "./components/SecureProofImage.jsx";
@@ -519,13 +520,14 @@ function MemberHome(props) {
     var ordered = rotationOrderedMembers(sorted, todayPeople, historyRows);
     var idx = ordered.findIndex(function(m) { return m.id === targetId; });
     if (idx < 0) return null;
-    // 오늘 배정자는 ordered[0](0일)이므로, 다음 사람(idx 1)은 3일, 그다음 6일… (3일마다 1명)
+    // 학교별 홍보 주기로 다음 순번까지 남은 일수를 계산합니다.
+    var interval = promotionIntervalDays(sorted[0]?.school);
     var baseDelay = 0;
     if (!todayPeople.length && last) {
       // 오늘 배정자가 아직 없으면, 마지막 배정일 기준 다음 순번까지 남은 일수로 시작
-      baseDelay = Math.max(0, 3 - daysBetweenKST(last.mission_date, today));
+      baseDelay = Math.max(0, interval - daysBetweenKST(last.mission_date, today));
     }
-    return baseDelay + idx * 3;
+    return baseDelay + idx * interval;
   }
   function estimateMyTurnDays() {
     var mySchoolMembers = members.filter(function(m) { return schoolKey(m.school) === schoolKey(session.member.school); });
@@ -617,9 +619,9 @@ function MemberHome(props) {
             <div style={{ fontSize: fitFontSize(postTitleOf(mission), 12, 10, 18, 7), lineHeight: "18px", color: SUB, fontWeight: 800, marginBottom: 10, whiteSpace: "normal", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "keep-all" }}>{postTitleOf(mission) || "게시물 제목 없음"}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <button onClick={function() { copyHomePost("게시글 제목", postTitleOf(mission)); }} style={btnSmall({ background: "#EEF5FF", color: BLUE, borderRadius: 12, padding: "11px 8px", fontSize: 12 })}>게시글 제목 복사</button>
-              <button onClick={function() { copyHomePost("게시글 내용", postBodyOf(mission)); }} style={btnSmall({ background: "#EEF5FF", color: BLUE, borderRadius: 12, padding: "11px 8px", fontSize: 12 })}>게시글 내용 복사</button>
+              <button onClick={function() { copyHomePost("게시글 내용", promotionCopyForSchool(postBodyOf(mission), session.member.school)); }} style={btnSmall({ background: "#EEF5FF", color: BLUE, borderRadius: 12, padding: "11px 8px", fontSize: 12 })}>게시글 내용 복사</button>
             </div>
-            <button onClick={function() { copyHomePost("게시글 제목+내용", [postTitleOf(mission), postBodyOf(mission)].filter(Boolean).join("\n\n")); }} style={btnPrimary({ marginTop: 8, borderRadius: 14, padding: "12px 0", fontSize: 14 })}>게시글 제목+내용 복사</button>
+            <button onClick={function() { copyHomePost("게시글 제목+내용", [postTitleOf(mission), promotionCopyForSchool(postBodyOf(mission), session.member.school)].filter(Boolean).join("\n\n")); }} style={btnPrimary({ marginTop: 8, borderRadius: 14, padding: "12px 0", fontSize: 14 })}>게시글 제목+내용 복사</button>
             {copyMsg && <div style={{ marginTop: 9, fontSize: 12, color: copyMsg.indexOf("실패") !== -1 ? "#E04848" : "#10A26A", fontWeight: 900 }}>{copyMsg}</div>}
           </div>
 
@@ -760,7 +762,7 @@ function MemberCert(props) {
   }
 
   function fullPostText() {
-    return [postTitleOf(mission), postBodyOf(mission)].filter(Boolean).join("\n\n");
+    return [postTitleOf(mission), promotionCopyForSchool(postBodyOf(mission), session.member.school)].filter(Boolean).join("\n\n");
   }
 
   if (loading) return <CenteredMsg msg="불러오는 중..." />;
@@ -840,7 +842,7 @@ function MemberCert(props) {
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}>
           <button onClick={function() { copyPostText("게시글 제목", postTitleOf(mission)); }} style={btnSmall({ background: "#EEF5FF", color: BLUE, borderRadius: 12, padding: "11px 8px", fontSize: 12 })}>게시글 제목 복사</button>
-          <button onClick={function() { copyPostText("게시글 내용", postBodyOf(mission)); }} style={btnSmall({ background: "#EEF5FF", color: BLUE, borderRadius: 12, padding: "11px 8px", fontSize: 12 })}>게시글 내용 복사</button>
+          <button onClick={function() { copyPostText("게시글 내용", promotionCopyForSchool(postBodyOf(mission), session.member.school)); }} style={btnSmall({ background: "#EEF5FF", color: BLUE, borderRadius: 12, padding: "11px 8px", fontSize: 12 })}>게시글 내용 복사</button>
         </div>
         <button onClick={function() { copyPostText("게시글 제목+내용", fullPostText()); }} style={btnPrimary({ marginTop: 8, borderRadius: 14, padding: "13px 0", fontSize: 14 })}>게시글 제목+내용 복사</button>
         {copyMsg && <div style={{ marginTop: 10, fontSize: 12, color: copyMsg.indexOf("실패") !== -1 ? "#E04848" : "#10A26A", fontWeight: 900 }}>{copyMsg}</div>}
@@ -852,7 +854,7 @@ function MemberCert(props) {
           </div>
           <div style={{ padding: "11px 12px" }}>
             <div style={{ fontSize: 11, color: SUB, fontWeight: 900, marginBottom: 4 }}>게시글 내용</div>
-            <div style={{ fontSize: 13, lineHeight: 1.65, color: INK, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{postBodyOf(mission) || "입력된 내용이 없습니다."}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.65, color: INK, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{promotionCopyForSchool(postBodyOf(mission), session.member.school) || "입력된 내용이 없습니다."}</div>
           </div>
         </div>
 
@@ -1536,8 +1538,8 @@ function AdminMission(props) {
       var history = assignmentHistory.filter(function(a) { return schoolKey(a.school) === schoolKey(group.school); });
       var last = history[0] || null;
       var pick = null;
-      if (last && daysBetweenKST(last.mission_date, today) < 3) {
-        skipped.push(group.school + " 없음(3일 주기)");
+      if (last && daysBetweenKST(last.mission_date, today) < promotionIntervalDays(group.school)) {
+        skipped.push(group.school + " 없음(" + promotionIntervalDays(group.school) + "일 주기)");
       } else if (!last) {
         pick = sorted[0];
       } else {
@@ -1889,7 +1891,7 @@ function AdminMission(props) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={card({ padding: 0, overflow: "hidden" })}>
-            <AdminCardSection title="자동 배정 미리보기" subtitle="오늘의 미션이 생성되면 아래 대상자들에게 자동으로 배정됩니다.">
+            <AdminCardSection title="자동 배정 미리보기" subtitle="학교별 자동 선택으로 계산한 대상자가 미션 저장 시 배정됩니다.">
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", gap: 10, marginBottom: 16 }}>
                 <PreviewStat label="전체 학교" value={new Set(members.map(function(m) { return m.school; })).size} unit="개" />
                 <PreviewStat label="오늘 대상자" value={selected.size} unit="명" />
@@ -1900,7 +1902,7 @@ function AdminMission(props) {
                 <div style={{ border: "1px solid #E5EAF2", background: "#F8FAFF", borderRadius: 12, padding: 12 }}>
                   <div style={{ fontSize: 13, color: "#071C59", fontWeight: 900, marginBottom: 6 }}>학교별 자동 배정 규칙</div>
                   <div style={{ fontSize: 12, color: "#42506A", fontWeight: 700, lineHeight: 1.65 }}>
-                    학교별 마지막 배정일로부터 3일이 지난 학교만 자동 선정합니다. 선정되는 학교 안에서는 부원 수와 관계없이 가나다순 다음 순번을 배정합니다.
+                    학교별 마지막 배정일로부터 기본 3일, 연세대학교 미래캠퍼스는 14일이 지난 학교만 자동 선정합니다. 선정되는 학교 안에서는 부원 수와 관계없이 가나다순 다음 순번을 배정합니다.
                   </div>
                 </div>
               </div>
@@ -2190,7 +2192,7 @@ function AdminMissionHistory() {
             <div style={card({ padding: 0, overflow: "hidden" })}>
               <div style={{ padding: "14px 16px", borderBottom: "1px solid #EEF2F8", display: "flex", justifyContent: "space-between", gap: 10 }}>
                 <b style={{ color: "#071C59", fontSize: 15 }}>{activeSchool || "학교 선택"}</b>
-                <span style={{ color: BLUE, fontSize: 12, fontWeight: 900 }}>3일 1회 기준</span>
+                <span style={{ color: BLUE, fontSize: 12, fontWeight: 900 }}>{promotionIntervalDays(activeSchool)}일 1회 기준</span>
               </div>
               {activeSchoolRows.length === 0 ? <Empty /> : activeSchoolRows.slice(0, 20).map(function(row, i) {
                 var done = [ST.SUBMITTED, ST.APPROVED, ST.LATE].indexOf(row.status) !== -1;
